@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+body {
+  @apply bg-stone-100 text-stone-900 antialiased;
+}
+
+input,
+select,
+textarea {
+  @apply bg-white;
+}
+
+.card {
+  @apply bg-white rounded-xl border border-stone-200 shadow-sm;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-1 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50 cursor-pointer;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-1 rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 cursor-pointer;
+}
+
+.btn-danger {
+  @apply inline-flex items-center justify-center gap-1 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 cursor-pointer;
+}
+
+.input {
+  @apply w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600;
+}
+
+.label {
+  @apply block text-xs font-medium text-stone-500 mb-1;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+  }
+}
