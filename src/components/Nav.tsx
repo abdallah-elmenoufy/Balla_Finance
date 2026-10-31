@@ -4,13 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const items = [
-  { href: "/", label: "Dashboard", emoji: "🏠" },
-  { href: "/transactions", label: "Transactions", emoji: "💸" },
-  { href: "/accounts", label: "Accounts", emoji: "🏦" },
-  { href: "/people", label: "امانة People", emoji: "🤝" },
+  { href: "/", label: "الرئيسية", emoji: "🏠" },
+  { href: "/transactions", label: "العمليات", emoji: "💸" },
+  { href: "/people", label: "الأمانات والديون", emoji: "🤝" },
+  { href: "/accounts", label: "الحسابات والبطاقات", emoji: "🏦" },
   { href: "/bnpl", label: "أقساط BNPL", emoji: "📅" },
-  { href: "/reports", label: "Reports", emoji: "📊" },
-  { href: "/settings", label: "Settings", emoji: "⚙️" },
+  { href: "/reports", label: "التقارير", emoji: "📊" },
+  { href: "/settings", label: "الإعدادات", emoji: "⚙️" },
 ];
 
 function isActive(pathname: string, href: string) {

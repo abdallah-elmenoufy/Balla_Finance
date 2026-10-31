@@ -1,12 +1,17 @@
 import { db } from "./db";
 import type {
   AccountWithBalance,
+  AnalyticsData,
+  AnalyticsInterval,
   BnplInstallment,
   BnplPlan,
   Category,
+  CreditCardStatus,
   Currency,
+  OverallDebtSummary,
   Person,
   PersonBalance,
+  PersonDebtSummary,
   Txn,
 } from "./types";
 
@@ -73,9 +78,10 @@ export function personTxnCount(id: number): number {
   return r.n;
 }
 
-/** Positive balance = I am holding their money (I owe them). Negative = they owe me. */
+/** Positive balance = I owe them (دين عليا واجب السداد). Negative = they owe me. */
 export function getPersonBalances(): PersonBalance[] {
-  return db()
+  const people = getPeople(true);
+  const rows = db()
     .prepare(
       `SELECT person_id, person_currency AS currency,
         SUM(CASE type
@@ -88,7 +94,26 @@ export function getPersonBalances(): PersonBalance[] {
        WHERE person_id IS NOT NULL AND person_currency IS NOT NULL
        GROUP BY person_id, person_currency`
     )
-    .all() as PersonBalance[];
+    .all() as { person_id: number; currency: string; balance: number }[];
+
+  const map = new Map<string, number>();
+  for (const p of people) {
+    if (p.initial_debt > 0) {
+      const key = `${p.id}:${p.initial_currency || "EGP"}`;
+      map.set(key, p.initial_debt);
+    }
+  }
+  for (const r of rows) {
+    const key = `${r.person_id}:${r.currency}`;
+    map.set(key, (map.get(key) ?? 0) + r.balance);
+  }
+
+  const result: PersonBalance[] = [];
+  for (const [key, balance] of map.entries()) {
+    const [pid, currency] = key.split(":");
+    result.push({ person_id: Number(pid), currency, balance });
+  }
+  return result;
 }
 
 export function getCategories(): Category[] {
@@ -210,6 +235,7 @@ export function personLedger(
   to?: string,
   opening?: Map<string, number>
 ): LedgerEntry[] {
+  const person = getPerson(personId);
   const conds = ["t.person_id = ?"];
   const params: (string | number)[] = [personId];
   if (from) {
@@ -224,6 +250,9 @@ export function personLedger(
     .prepare(`${TXN_SELECT} WHERE ${conds.join(" AND ")} ORDER BY t.date, t.id`)
     .all(...params) as TxnRow[];
   const balances = new Map<string, number>(opening ?? []);
+  if (!opening && person && person.initial_debt > 0) {
+    balances.set(person.initial_currency || "EGP", person.initial_debt);
+  }
   const entries: LedgerEntry[] = [];
   for (const t of txns) {
     const cur = t.person_currency ?? "";
@@ -250,6 +279,7 @@ export function personLedger(
 
 /** Balance of a person in each currency BEFORE the given date (for statement opening balance). */
 export function personBalanceBefore(personId: number, date: string): Map<string, number> {
+  const person = getPerson(personId);
   const rows = db()
     .prepare(
       `SELECT person_currency AS currency,
@@ -263,7 +293,14 @@ export function personBalanceBefore(personId: number, date: string): Map<string,
        GROUP BY person_currency`
     )
     .all(personId, date) as { currency: string; balance: number }[];
-  return new Map(rows.map((r) => [r.currency, r.balance]));
+  const map = new Map<string, number>();
+  if (person && person.initial_debt > 0) {
+    map.set(person.initial_currency || "EGP", person.initial_debt);
+  }
+  for (const r of rows) {
+    map.set(r.currency, (map.get(r.currency) ?? 0) + r.balance);
+  }
+  return map;
 }
 
 // ---------- BNPL ----------
@@ -370,4 +407,361 @@ export function monthlyTotals(month: string): MonthTotals[] {
        GROUP BY a.currency`
     )
     .all(`${month}-%`) as MonthTotals[];
+}
+
+// ---------- Debt Management (الأمانات والديون العائلية) ----------
+
+export function getPersonDebtSummaries(): PersonDebtSummary[] {
+  const people = getPeople();
+  const result: PersonDebtSummary[] = [];
+
+  for (const p of people) {
+    const cur = p.initial_currency || "EGP";
+    const initial = p.initial_debt || 0;
+
+    const addRow = db()
+      .prepare(
+        `SELECT SUM(person_amount) AS total FROM transactions
+         WHERE person_id = ? AND person_currency = ? AND type IN ('person_in', 'adjustment') AND person_amount > 0`
+      )
+      .get(p.id, cur) as { total: number | null };
+    const additional = addRow?.total ?? 0;
+
+    const repayRow = db()
+      .prepare(
+        `SELECT SUM(person_amount) AS total FROM transactions
+         WHERE person_id = ? AND person_currency = ? AND (type = 'person_out' OR (type = 'expense' AND person_id IS NOT NULL))`
+      )
+      .get(p.id, cur) as { total: number | null };
+    const repaid = repayRow?.total ?? 0;
+
+    const total_debt_original = initial + additional;
+    const remaining = Math.max(0, total_debt_original - repaid);
+    const progress =
+      total_debt_original > 0
+        ? Math.min(100, Math.round((repaid / total_debt_original) * 100))
+        : repaid > 0
+          ? 100
+          : 0;
+    const is_settled = remaining === 0 && total_debt_original > 0;
+
+    result.push({
+      person_id: p.id,
+      name: p.name,
+      note: p.note,
+      currency: cur,
+      initial_debt: initial,
+      additional_debt: additional,
+      total_debt_original,
+      repaid,
+      remaining,
+      progress,
+      is_settled,
+    });
+  }
+
+  return result.sort((a, b) => {
+    if (a.is_settled !== b.is_settled) return a.is_settled ? 1 : -1;
+    return b.remaining - a.remaining;
+  });
+}
+
+export function getOverallDebtSummary(targetCurrency = "EGP"): OverallDebtSummary {
+  const summaries = getPersonDebtSummaries().filter((s) => s.currency === targetCurrency);
+  let total_debt_original = 0;
+  let total_repaid = 0;
+  let total_remaining = 0;
+  let active_debts_count = 0;
+  let settled_debts_count = 0;
+
+  for (const s of summaries) {
+    total_debt_original += s.total_debt_original;
+    total_repaid += s.repaid;
+    total_remaining += s.remaining;
+    if (s.total_debt_original > 0) {
+      if (s.is_settled) settled_debts_count++;
+      else active_debts_count++;
+    }
+  }
+
+  const overall_progress =
+    total_debt_original > 0
+      ? Math.min(100, Math.round((total_repaid / total_debt_original) * 100))
+      : 0;
+
+  return {
+    currency: targetCurrency,
+    total_debt_original,
+    total_repaid,
+    total_remaining,
+    overall_progress,
+    active_debts_count,
+    settled_debts_count,
+  };
+}
+
+// ---------- Credit Card Watchlist (حماية البطاقات من الغرامات) ----------
+
+export function getCreditCardsStatus(): CreditCardStatus[] {
+  const accounts = getAccounts();
+  const cards = accounts.filter((a) => a.type === "credit_card" && a.due_day != null);
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const currentDay = now.getDate();
+
+  return cards
+    .map((c) => {
+      const dueDay = c.due_day!;
+      let targetYear = currentYear;
+      let targetMonth = currentMonth;
+      if (currentDay > dueDay) {
+        targetMonth += 1;
+        if (targetMonth > 11) {
+          targetMonth = 0;
+          targetYear += 1;
+        }
+      }
+      const maxDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+      const actualDueDay = Math.min(dueDay, maxDay);
+      const targetDueDate = new Date(targetYear, targetMonth, actualDueDay);
+      const yStr = targetYear;
+      const mStr = String(targetMonth + 1).padStart(2, "0");
+      const dStr = String(actualDueDay).padStart(2, "0");
+      const next_due_date = `${yStr}-${mStr}-${dStr}`;
+
+      const msDiff =
+        targetDueDate.getTime() - new Date(currentYear, currentMonth, currentDay).getTime();
+      const days_left = Math.round(msDiff / (1000 * 3600 * 24));
+
+      const owed_amount = c.balance < 0 ? -c.balance : 0;
+      const is_paid = owed_amount === 0;
+
+      let status: CreditCardStatus["status"] = "upcoming";
+      if (is_paid) {
+        status = "paid";
+      } else if (days_left < 0) {
+        status = "overdue";
+      } else if (days_left <= 2) {
+        status = "urgent";
+      } else if (days_left <= 7) {
+        status = "soon";
+      }
+
+      const utilization_percent =
+        c.credit_limit && c.credit_limit > 0
+          ? Math.min(100, Math.round((owed_amount / c.credit_limit) * 100))
+          : null;
+
+      return {
+        id: c.id,
+        name: c.name,
+        currency: c.currency,
+        balance: c.balance,
+        owed_amount,
+        credit_limit: c.credit_limit,
+        utilization_percent,
+        due_day: dueDay,
+        statement_day: c.statement_day,
+        next_due_date,
+        days_left,
+        status,
+        emoji: c.emoji,
+      };
+    })
+    .sort((a, b) => {
+      if (a.status === "paid" && b.status !== "paid") return 1;
+      if (a.status !== "paid" && b.status === "paid") return -1;
+      return a.days_left - b.days_left;
+    });
+}
+
+// ---------- Analytics & Visual Charts (إحصائيات ورسوم بيانية) ----------
+
+const ARABIC_DAYS = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+const ARABIC_MONTHS = [
+  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+];
+
+export function getAnalyticsData(
+  period: "week" | "month" | "year" | "all" = "month",
+  targetCurrency = "EGP"
+): AnalyticsData {
+  const now = new Date();
+  const intervals: AnalyticsInterval[] = [];
+  let startDate = "";
+  let endDate = "";
+
+  if (period === "week") {
+    // Last 7 days
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      if (i === 6) startDate = iso;
+      if (i === 0) endDate = iso;
+      const dayName = ARABIC_DAYS[d.getDay()];
+      intervals.push({
+        label: `${dayName} ${d.getDate()}`,
+        key: iso,
+        income: 0,
+        expense: 0,
+        debt_repaid: 0,
+      });
+    }
+  } else if (period === "month") {
+    // Current month 4 weeks
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const mStr = String(m + 1).padStart(2, "0");
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    startDate = `${y}-${mStr}-01`;
+    endDate = `${y}-${mStr}-${String(lastDay).padStart(2, "0")}`;
+
+    const ranges = [
+      { label: "1-7 " + ARABIC_MONTHS[m], start: 1, end: 7 },
+      { label: "8-14 " + ARABIC_MONTHS[m], start: 8, end: 14 },
+      { label: "15-21 " + ARABIC_MONTHS[m], start: 15, end: 21 },
+      { label: `22-${lastDay} ` + ARABIC_MONTHS[m], start: 22, end: lastDay },
+    ];
+    ranges.forEach((r, idx) => {
+      intervals.push({
+        label: r.label,
+        key: `W${idx + 1}`,
+        income: 0,
+        expense: 0,
+        debt_repaid: 0,
+      });
+    });
+  } else if (period === "year") {
+    // 12 months of current year
+    const y = now.getFullYear();
+    startDate = `${y}-01-01`;
+    endDate = `${y}-12-31`;
+    for (let m = 0; m < 12; m++) {
+      intervals.push({
+        label: ARABIC_MONTHS[m],
+        key: `${y}-${String(m + 1).padStart(2, "0")}`,
+        income: 0,
+        expense: 0,
+        debt_repaid: 0,
+      });
+    }
+  } else {
+    // All: Last 6 months
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (i === 5) startDate = `${ym}-01`;
+      if (i === 0) {
+        const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+        endDate = `${ym}-${String(lastDay).padStart(2, "0")}`;
+      }
+      intervals.push({
+        label: `${ARABIC_MONTHS[d.getMonth()]} ${d.getFullYear() % 100}`,
+        key: ym,
+        income: 0,
+        expense: 0,
+        debt_repaid: 0,
+      });
+    }
+  }
+
+  // Populate intervals
+  const txns = db()
+    .prepare(
+      `SELECT t.*, a.currency AS account_currency
+       FROM transactions t
+       LEFT JOIN accounts a ON a.id = t.account_id
+       WHERE t.date >= ? AND t.date <= ?
+       ORDER BY t.date`
+    )
+    .all(startDate, endDate) as (Txn & { account_currency: string | null })[];
+
+  for (const t of txns) {
+    const cur = t.account_currency ?? t.person_currency ?? "EGP";
+    if (cur !== targetCurrency) continue;
+
+    let targetInterval: AnalyticsInterval | undefined;
+    if (period === "week") {
+      targetInterval = intervals.find((it) => it.key === t.date);
+    } else if (period === "month") {
+      const dayNum = parseInt(t.date.slice(8, 10), 10);
+      if (dayNum <= 7) targetInterval = intervals[0];
+      else if (dayNum <= 14) targetInterval = intervals[1];
+      else if (dayNum <= 21) targetInterval = intervals[2];
+      else targetInterval = intervals[3];
+    } else {
+      const ym = t.date.slice(0, 7);
+      targetInterval = intervals.find((it) => it.key === ym);
+    }
+
+    if (targetInterval) {
+      if (t.type === "income") {
+        targetInterval.income += t.amount;
+      } else if (t.type === "expense" && !t.person_id) {
+        targetInterval.expense += t.amount;
+      } else if (t.type === "person_out" || (t.type === "expense" && t.person_id)) {
+        targetInterval.debt_repaid += t.amount;
+      }
+    }
+  }
+
+  // Calculate cumulative remaining debt over time
+  const overallDebt = getOverallDebtSummary(targetCurrency);
+  let runningDebt = overallDebt.total_debt_original;
+  for (const it of intervals) {
+    runningDebt = Math.max(0, runningDebt - it.debt_repaid);
+    it.remaining_debt = runningDebt;
+  }
+
+  // Aggregated totals
+  let totalIncome = 0;
+  let totalExpense = 0;
+  let totalDebtRepaid = 0;
+  for (const it of intervals) {
+    totalIncome += it.income;
+    totalExpense += it.expense;
+    totalDebtRepaid += it.debt_repaid;
+  }
+
+  // Top spending categories in this period
+  const catRows = db()
+    .prepare(
+      `SELECT c.id, c.name, c.emoji, SUM(t.amount) AS total
+       FROM transactions t
+       JOIN accounts a ON a.id = t.account_id
+       LEFT JOIN categories c ON c.id = t.category_id
+       WHERE t.type = 'expense' AND t.person_id IS NULL AND a.currency = ? AND t.date >= ? AND t.date <= ?
+       GROUP BY c.id
+       ORDER BY total DESC
+       LIMIT 5`
+    )
+    .all(targetCurrency, startDate, endDate) as {
+      id: number | null;
+      name: string | null;
+      emoji: string | null;
+      total: number;
+    }[];
+
+  const topCategories = catRows.map((r) => ({
+    category_id: r.id,
+    name: r.name ?? "أخرى / بدون تصنيف",
+    emoji: r.emoji ?? "📦",
+    amount: r.total,
+    percentage: totalExpense > 0 ? Math.round((r.total / totalExpense) * 100) : 0,
+  }));
+
+  return {
+    period,
+    currency: targetCurrency,
+    intervals,
+    totals: {
+      income: totalIncome,
+      expense: totalExpense,
+      debt_repaid: totalDebtRepaid,
+      net_savings: totalIncome - (totalExpense + totalDebtRepaid),
+    },
+    topCategories,
+  };
 }

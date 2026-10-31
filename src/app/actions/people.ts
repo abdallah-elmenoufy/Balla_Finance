@@ -3,14 +3,23 @@
 import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { personTxnCount } from "@/lib/queries";
+import { toMinor } from "@/lib/money";
+import { getCurrency, personTxnCount } from "@/lib/queries";
 
 export async function createPerson(formData: FormData): Promise<void> {
   await requireAuth();
   const name = String(formData.get("name") ?? "").trim();
   const note = String(formData.get("note") ?? "").trim() || null;
+  const initialCurrency = String(formData.get("initial_currency") ?? "EGP").trim() || "EGP";
+  const dec = getCurrency(initialCurrency)?.decimals ?? 2;
+  const initialDebtRaw = String(formData.get("initial_debt") ?? "").trim();
+  const initialDebt = initialDebtRaw ? toMinor(initialDebtRaw, dec) : 0;
   if (!name) return;
-  db().prepare("INSERT INTO people (name, note) VALUES (?,?)").run(name, note);
+  db()
+    .prepare(
+      "INSERT INTO people (name, note, initial_debt, initial_currency) VALUES (?,?,?,?)"
+    )
+    .run(name, note, initialDebt, initialCurrency);
   revalidatePath("/", "layout");
 }
 
@@ -18,8 +27,16 @@ export async function updatePerson(id: number, formData: FormData): Promise<void
   await requireAuth();
   const name = String(formData.get("name") ?? "").trim();
   const note = String(formData.get("note") ?? "").trim() || null;
+  const initialCurrency = String(formData.get("initial_currency") ?? "EGP").trim() || "EGP";
+  const dec = getCurrency(initialCurrency)?.decimals ?? 2;
+  const initialDebtRaw = String(formData.get("initial_debt") ?? "").trim();
+  const initialDebt = initialDebtRaw ? toMinor(initialDebtRaw, dec) : 0;
   if (!name) return;
-  db().prepare("UPDATE people SET name=?, note=? WHERE id=?").run(name, note, id);
+  db()
+    .prepare(
+      "UPDATE people SET name=?, note=?, initial_debt=?, initial_currency=? WHERE id=?"
+    )
+    .run(name, note, initialDebt, initialCurrency, id);
   revalidatePath("/", "layout");
 }
 

@@ -125,8 +125,20 @@ export async function createTxn(formData: FormData): Promise<void> {
       t.payee, t.notes
     );
   revalidatePath("/", "layout");
-  const back = String(formData.get("redirect_to") ?? "").trim();
-  if (back) redirect(back);
+  let back = String(formData.get("redirect_to") ?? "").trim();
+  if (back) {
+    if (t.type === "person_out" || (t.type === "expense" && t.person_id)) {
+      const sep = back.includes("?") ? "&" : "?";
+      back = `${back}${sep}celebrate=debt_repaid&amount=${t.amount}`;
+    } else if (t.type === "transfer" && t.to_account_id) {
+      const toAcc = db().prepare("SELECT type FROM accounts WHERE id=?").get(t.to_account_id) as { type: string } | undefined;
+      if (toAcc?.type === "credit_card") {
+        const sep = back.includes("?") ? "&" : "?";
+        back = `${back}${sep}celebrate=card_paid&amount=${t.amount}`;
+      }
+    }
+    redirect(back);
+  }
 }
 
 export async function updateTxn(id: number, formData: FormData): Promise<void> {

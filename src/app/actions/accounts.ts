@@ -17,8 +17,10 @@ function parseAccountForm(formData: FormData) {
   const credit_limit = creditRaw ? toMinor(creditRaw, dec) : null;
   const dueRaw = String(formData.get("due_day") ?? "").trim();
   const due_day = dueRaw ? Math.min(31, Math.max(1, Number(dueRaw))) : null;
+  const statementRaw = String(formData.get("statement_day") ?? "").trim();
+  const statement_day = statementRaw ? Math.min(31, Math.max(1, Number(statementRaw))) : null;
   const emoji = String(formData.get("emoji") ?? "").trim() || null;
-  return { name, type, currency, opening, credit_limit, due_day, emoji };
+  return { name, type, currency, opening, credit_limit, due_day, statement_day, emoji };
 }
 
 export async function createAccount(formData: FormData): Promise<void> {
@@ -27,9 +29,9 @@ export async function createAccount(formData: FormData): Promise<void> {
   if (!f.name) return;
   db()
     .prepare(
-      "INSERT INTO accounts (name, type, currency, opening_balance, credit_limit, due_day, emoji) VALUES (?,?,?,?,?,?,?)"
+      "INSERT INTO accounts (name, type, currency, opening_balance, credit_limit, due_day, statement_day, emoji) VALUES (?,?,?,?,?,?,?,?)"
     )
-    .run(f.name, f.type, f.currency, f.opening, f.credit_limit, f.due_day, f.emoji);
+    .run(f.name, f.type, f.currency, f.opening, f.credit_limit, f.due_day, f.statement_day, f.emoji);
   revalidatePath("/", "layout");
 }
 
@@ -39,9 +41,9 @@ export async function updateAccount(id: number, formData: FormData): Promise<voi
   if (!f.name) return;
   db()
     .prepare(
-      "UPDATE accounts SET name=?, type=?, currency=?, opening_balance=?, credit_limit=?, due_day=?, emoji=? WHERE id=?"
+      "UPDATE accounts SET name=?, type=?, currency=?, opening_balance=?, credit_limit=?, due_day=?, statement_day=?, emoji=? WHERE id=?"
     )
-    .run(f.name, f.type, f.currency, f.opening, f.credit_limit, f.due_day, f.emoji, id);
+    .run(f.name, f.type, f.currency, f.opening, f.credit_limit, f.due_day, f.statement_day, f.emoji, id);
   revalidatePath("/", "layout");
 }
 

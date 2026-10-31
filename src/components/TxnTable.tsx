@@ -15,11 +15,33 @@ function amountCell(t: TxnRow) {
   const cur = t.account_currency ?? t.person_currency ?? "";
   switch (t.type) {
     case "income":
+      return <span className="text-emerald-700 font-bold">+{fmtMoney(t.amount, cur)}</span>;
     case "person_in":
-      return <span className="text-emerald-700 font-semibold">+{fmtMoney(t.amount, cur)}</span>;
-    case "expense":
+      return (
+        <span className="text-amber-800 font-bold">
+          +{fmtMoney(t.person_amount ?? t.amount, t.person_currency ?? cur)}
+        </span>
+      );
     case "person_out":
-      return <span className="text-red-600 font-semibold">−{fmtMoney(t.amount, cur)}</span>;
+      return (
+        <span className="text-purple-700 font-bold flex items-center justify-end gap-1">
+          <span className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded-sm">
+            سداد دين
+          </span>
+          <span>−{fmtMoney(t.amount, cur)}</span>
+        </span>
+      );
+    case "expense":
+      return (
+        <span className="text-red-600 font-semibold">
+          −{fmtMoney(t.amount, cur)}
+          {t.person_name && (
+            <span className="text-[10px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded-sm mr-1">
+              عن الغير
+            </span>
+          )}
+        </span>
+      );
     case "transfer":
       return (
         <span className="text-stone-700 font-semibold">

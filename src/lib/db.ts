@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   opening_balance INTEGER NOT NULL DEFAULT 0,
   credit_limit INTEGER,
   due_day INTEGER,
+  statement_day INTEGER,
   emoji TEXT,
   archived INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
@@ -35,6 +36,8 @@ CREATE TABLE IF NOT EXISTS people (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   note TEXT,
+  initial_debt INTEGER NOT NULL DEFAULT 0,
+  initial_currency TEXT NOT NULL DEFAULT 'EGP',
   archived INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -130,6 +133,18 @@ function seed(d: Database.Database) {
   }
 }
 
+function migrate(d: Database.Database) {
+  try {
+    d.prepare("ALTER TABLE people ADD COLUMN initial_debt INTEGER NOT NULL DEFAULT 0").run();
+  } catch {}
+  try {
+    d.prepare("ALTER TABLE people ADD COLUMN initial_currency TEXT NOT NULL DEFAULT 'EGP'").run();
+  } catch {}
+  try {
+    d.prepare("ALTER TABLE accounts ADD COLUMN statement_day INTEGER").run();
+  } catch {}
+}
+
 declare global {
   // eslint-disable-next-line no-var
   var __balla_db: Database.Database | undefined;
@@ -143,6 +158,7 @@ export function db(): Database.Database {
     d.pragma("journal_mode = WAL");
     d.pragma("foreign_keys = ON");
     d.exec(DDL);
+    migrate(d);
     seed(d);
     globalThis.__balla_db = d;
   }

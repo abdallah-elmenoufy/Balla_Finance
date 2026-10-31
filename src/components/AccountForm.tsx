@@ -60,12 +60,16 @@ export default function AccountForm({
       {isCredit && (
         <>
           <div>
-            <label className="label">Credit limit (optional)</label>
-            <input name="credit_limit" inputMode="decimal" defaultValue={major(initial?.credit_limit, cur)} className="input" />
+            <label className="label">Credit limit الحد الائتماني (اختياري)</label>
+            <input name="credit_limit" inputMode="decimal" defaultValue={major(initial?.credit_limit, cur)} className="input" placeholder="50000" />
           </div>
           <div>
-            <label className="label">Payment due day of month (optional)</label>
-            <input name="due_day" type="number" min={1} max={31} defaultValue={initial?.due_day ?? ""} className="input" />
+            <label className="label">Payment due day يوم استحقاق السداد (1-31)</label>
+            <input name="due_day" type="number" min={1} max={31} defaultValue={initial?.due_day ?? ""} className="input" placeholder="25" />
+          </div>
+          <div>
+            <label className="label">Statement cutoff day يوم صدور كشف الحساب (اختياري)</label>
+            <input name="statement_day" type="number" min={1} max={31} defaultValue={initial?.statement_day ?? ""} className="input" placeholder="5" />
           </div>
         </>
       )}

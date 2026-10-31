@@ -32,6 +32,7 @@ export interface Account {
   opening_balance: number;
   credit_limit: number | null;
   due_day: number | null;
+  statement_day: number | null;
   emoji: string | null;
   archived: number;
   sort_order: number;
@@ -46,6 +47,8 @@ export interface Person {
   id: number;
   name: string;
   note: string | null;
+  initial_debt: number;
+  initial_currency: string;
   archived: number;
   created_at: string;
 }
@@ -67,12 +70,12 @@ export type TxnType =
   | "adjustment";
 
 export const TXN_TYPE_LABELS: Record<TxnType, string> = {
-  expense: "Expense مصروف",
-  income: "Income دخل",
-  transfer: "Transfer تحويل",
-  person_in: "امانة In (received from person)",
-  person_out: "Paid for person / سداد",
-  adjustment: "Adjustment تسوية",
+  expense: "مصروف 🛒",
+  income: "دخل 💰",
+  transfer: "تحويل رصيد 🔄",
+  person_out: "سداد دين أمانة 🤝",
+  person_in: "استلام أمانة / دين جديد 📥",
+  adjustment: "تسوية رصيد ⚖️",
 };
 
 export interface Txn {
@@ -120,4 +123,72 @@ export interface PersonBalance {
   person_id: number;
   currency: string;
   balance: number;
+}
+
+export interface PersonDebtSummary {
+  person_id: number;
+  name: string;
+  note: string | null;
+  currency: string;
+  initial_debt: number;
+  additional_debt: number;
+  total_debt_original: number;
+  repaid: number;
+  remaining: number;
+  progress: number;
+  is_settled: boolean;
+}
+
+export interface OverallDebtSummary {
+  currency: string;
+  total_debt_original: number;
+  total_repaid: number;
+  total_remaining: number;
+  overall_progress: number;
+  active_debts_count: number;
+  settled_debts_count: number;
+}
+
+export interface CreditCardStatus {
+  id: number;
+  name: string;
+  currency: string;
+  balance: number;
+  owed_amount: number;
+  credit_limit: number | null;
+  utilization_percent: number | null;
+  due_day: number;
+  statement_day: number | null;
+  next_due_date: string;
+  days_left: number;
+  status: "paid" | "urgent" | "soon" | "upcoming" | "overdue";
+  emoji: string | null;
+}
+
+export interface AnalyticsInterval {
+  label: string;
+  key: string;
+  income: number;
+  expense: number;
+  debt_repaid: number;
+  remaining_debt?: number;
+}
+
+export interface AnalyticsData {
+  period: "week" | "month" | "year" | "all";
+  currency: string;
+  intervals: AnalyticsInterval[];
+  totals: {
+    income: number;
+    expense: number;
+    debt_repaid: number;
+    net_savings: number;
+  };
+  topCategories: {
+    category_id: number | null;
+    name: string;
+    emoji: string | null;
+    amount: number;
+    percentage: number;
+  }[];
 }

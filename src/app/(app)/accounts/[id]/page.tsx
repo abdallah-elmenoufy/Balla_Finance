@@ -43,11 +43,18 @@ export default async function AccountDetailPage({
           </div>
           {account.credit_limit != null && (
             <div className="text-xs text-stone-500">
-              limit {fmtMoney(account.credit_limit, account.currency)}
+              الحد الائتماني: {fmtMoney(account.credit_limit, account.currency)}
             </div>
           )}
           {account.due_day != null && (
-            <div className="text-xs text-amber-600">due day {account.due_day} of month</div>
+            <div className="text-xs text-amber-600 font-semibold">
+              يوم استحقاق السداد: {account.due_day} من كل شهر
+            </div>
+          )}
+          {account.statement_day != null && (
+            <div className="text-xs text-stone-500">
+              يوم صدور كشف الحساب: {account.statement_day}
+            </div>
           )}
         </div>
       </div>
