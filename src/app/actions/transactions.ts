@@ -41,7 +41,9 @@ function parseTxnForm(formData: FormData): ParsedTxn {
   const date = String(formData.get("date") ?? "").trim() || todayISO();
   const description = String(formData.get("description") ?? "").trim() || null;
   const payee = String(formData.get("payee") ?? "").trim() || null;
-  const notes = String(formData.get("notes") ?? "").trim() || null;
+  let notes = String(formData.get("notes") ?? "").trim() || null;
+  const exchangeRateRaw = String(formData.get("exchange_rate") ?? "").trim();
+  const exchangeRate = exchangeRateRaw ? Number(exchangeRateRaw) : null;
   const account_id = num(formData, "account_id");
   const to_account_id = num(formData, "to_account_id");
   let person_id = num(formData, "person_id");
@@ -75,8 +77,18 @@ function parseTxnForm(formData: FormData): ParsedTxn {
       const pDec = getCurrency(person_currency)?.decimals ?? 2;
       const pRaw = String(formData.get("person_amount") ?? "").trim();
       person_amount = pRaw ? toMinor(pRaw, pDec) : person_currency === accCur ? amount : null;
+      if (person_amount === null && exchangeRate && exchangeRate > 0 && amount > 0) {
+        // e.g. amount in EGP, debt in USD => USD amount = EGP / rate
+        const pUnits = (amount / 10 ** accDec) / exchangeRate;
+        person_amount = Math.round(pUnits * 10 ** pDec);
+      }
       if (person_amount === null)
         throw new Error("Enter the amount in the person's currency");
+
+      if (exchangeRate && exchangeRate > 0 && person_currency !== accCur) {
+        const rateNote = `سعر التحويل: 1 ${person_currency} = ${exchangeRate} ${accCur ?? "EGP"}`;
+        notes = notes ? `${notes} • ${rateNote}` : rateNote;
+      }
     }
   }
 
@@ -129,7 +141,16 @@ export async function createTxn(formData: FormData): Promise<void> {
   if (back) {
     if (t.type === "person_out" || (t.type === "expense" && t.person_id)) {
       const sep = back.includes("?") ? "&" : "?";
-      back = `${back}${sep}celebrate=debt_repaid&amount=${t.amount}`;
+      const aCur = accountCurrency(t.account_id) || "EGP";
+      const pAmt = t.person_amount ?? t.amount;
+      const pCur = t.person_currency || aCur;
+      back = `${back}${sep}celebrate=debt_repaid&amount=${t.amount}&currency=${aCur}&person_amount=${pAmt}&person_currency=${pCur}`;
+    } else if (t.type === "person_in" && t.person_id) {
+      const sep = back.includes("?") ? "&" : "?";
+      const aCur = accountCurrency(t.account_id) || "EGP";
+      const pAmt = t.person_amount ?? t.amount;
+      const pCur = t.person_currency || aCur;
+      back = `${back}${sep}celebrate=receivable_collected&amount=${t.amount}&currency=${aCur}&person_amount=${pAmt}&person_currency=${pCur}`;
     } else if (t.type === "transfer" && t.to_account_id) {
       const toAcc = db().prepare("SELECT type FROM accounts WHERE id=?").get(t.to_account_id) as { type: string } | undefined;
       if (toAcc?.type === "credit_card") {

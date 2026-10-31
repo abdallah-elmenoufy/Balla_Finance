@@ -1,82 +1,130 @@
 # 💰 Balla Finance
 
-Personal finance tracker tailored for managing money across Egyptian accounts,
-BNPL installments (أقساط), and family امانة — built to replace scattered Excel
-sheets and WhatsApp threads.
+تطبيق إدارة الأموال والالتزامات المالية الشخصية — مصمم ومفصل خصيصاً لإدارة الحسابات المصرية، أقساط المشتريات (BNPL)، وسداد **الأمانات والديون العائلية** مع خطة تحرر تفاعلية وحماية كاملة من غرامات البطاقات الائتمانية.
 
-Everything runs **locally on your Mac**. Your data never leaves your machine —
-it all lives in one SQLite file: `data/balla.db`.
+يعمل التطبيق **محلياً بالكامل على جهاز الماك (Local-first & Offline)**؛ بياناتك المالية لا تغادر جهازك أبداً وتُحفظ بأمان في ملف قاعدة بيانات SQLite واحد: `data/balla.db`.
 
-## What it does
+---
 
-- **Accounts** — mobile wallets, banks, debit/credit cards, BNPL providers
-  (Valu, Souhoola, Tru…), cash. Create/archive/delete freely. Multi-currency
-  (EGP, USD, SAR, AED, … add more in Settings).
-- **Transactions** — expenses, income, transfers between accounts (including
-  cross-currency with the rate you actually got), and the امانة types:
-  - **امانة In** — someone sends/leaves money with you
-  - **Paid for person** — you pay a payee on someone's behalf
-  - **Expense on behalf of** — your expense form has an "on behalf of" field
-- **امانة People ledger** — every person has a running per-currency balance:
-  green = money they left with you (لهم), red = they owe you (عليهم).
-  Export a clean **statement (كشف حساب)** as a PNG for WhatsApp or print to PDF.
-- **BNPL أقساط** — a purchase creates a full installment schedule with due
-  dates; pay each installment from any account; overdue ones turn red on the
-  dashboard.
-- **Reports** — monthly income / your own spending / paid-for-others, by category.
-- **PIN lock** — so guests on your Wi-Fi can't open it. **Backup** — one-click
-  download of the database file from Settings.
+## 🌟 أبرز مميزات التطبيق (Features)
 
-## First run
+### 1. 🤝 رحلة التحرر من الأمانات والديون العائلية (Family Debts Engine)
+- **تسجيل رصيد الدين المبدئي (Initial Debt):** تسجيل مديونيات الأمانات القديمة مباشرة كالتزام واجب السداد في ذمتك دون ضخ "كاش وهمي" في حساباتك البنكية.
+- **شريط تقدم تفاعلي (Debt Burn-Down Progress):** متابعة نسبة ما تم سداده ومقدار المتبقي للتحرر التام، مع محطات إنجاز (25%، 50% نصف الطريق، 75%، 100% الحرية الكاملة).
+- **زاد الطريق والتحفيز (Motivational Quotes):** حكم وأحاديث نبوية شريفة عن الوفاء بالأمانة وتيسير سداد الدين، مع رسائل احتفالية عند كل عملية سداد ناجحة.
+- **كشف حساب أمانة رسمي (Statement Export):** استخراج كشف حساب واضح وشفاف لأي شخص لمشاركته كصورة على واتساب أو طباعته كـ PDF.
+
+### 2. 💼 متابعة الأموال المستحقة لك بالخارج (Receivables Engine — فلوس ليك برة)
+- **تسجيل المدينين ومستحقاتك الخارجية:** إمكانية إضافة أشخاص مدينين لك بمبالغ أو أمانات تحت بند "أموال مستحقة لي عند الآخرين (قيد التحصيل)"، ليكون التطبيق مرجعك الشامل لجميع التزاماتك وما لك وما عليك.
+- **بطاقة مركز المستحقات في لوحة التحكم (Receivables Hub):** عرض إجمالي المبالغ المنتظر تحصيلها بالعملات المختلفة (EGP و USD) وقائمة بالمدينين مع نسب التحصيل المحققة.
+- **تسجيل تحصيل سريع بضغطة زر واحدة (⚡ Quick Collect):**
+  - اختيار الشخص وتحديد المبلغ المودع والحساب المستلم (بنك، كاش، محفظة).
+  - حاسبة تحويل عملات لحظية في حال سداد مستحق دولاري بالجنيه أو العكس.
+  - إشعار احتفالي مبارك يثبت تحصيل المبلغ وإضافته للرصيد الفعلي فوراً.
+
+### 3. 💱 سداد ديون الدولار بالجنيه المصري وعرض العملات المتزامنة (Cross-Currency Engine & Dual-Display)
+- **عرض متزامن لجميع العملات (EGP + USD Stacked Display):** تظهر ديون الأمانات العائلية الإجمالية والمتبقية في لوحة التحكم وبطاقة رحلة التحرر بالجنيه المصري والدولار الأمريكي جنباً إلى جنب في نفس الوقت، مع أشرطة تقدم مستقلة لكل عملة دون إخفاء أي عملة خلف تبويبات.
+- **حساب تلقائي لسعر الصرف (Live Bidirectional Conversion):** عند سداد دين مسجل بالدولار ($ USD) من حساب بنكي أو محفظة بالجنيه المصري (ج.م EGP)، يوفر التطبيق حاسبة تحويل فورية.
+- **خصم دقيق من الحساب والدين معاً:**
+  - يتم خصم المبلغ المدفوع بالجنيه المصري من حسابك البنكي الفعلي.
+  - يتم تحويله بناءً على سعر الصرف المدخل وإسقاط القيمة المقابلة بالدولار مباشرة من دين الشخص.
+  - يُسجل سعر الصرف وتفاصيل العملية تلقائياً في بيان المعاملة وكشف الحساب لمنع أي لبس أو اختلاف مستقبلي.
+
+### 4. 🧾 إدارة أقساط المشتريات وتخصيص الجداول (BNPL Customized Schedules & Monthly Tracker)
+- **فصل كامل لمصطلحات الـ BNPL عن كروت الائتمان:** حسابات شركات التقسيط (فاليو، سهولة، كونتكت، أمان) تتميز بشروحات مخصصة توضح طبيعة التمويل الاستهلاكي وجداول الأقساط الشهرية بدلاً من حدود السحب وأيام قطع كشف الحساب.
+- **تخصيص كامل لمبالغ ومواعيد الأقساط (Custom Installment Schedule):**
+  - حاسبة تفاعلية تقسم المبلغ على عدد الشهور تلقائياً، مع إمكانية تعديل مبلغ وتاريخ استحقاق كل قسط شهري على حدة أثناء إنشاء الخطة لتطابق عقود التقسيط الواقعية بدقة.
+  - تعديل مواعيد وأرقام الأقساط القائمة في أي وقت.
+- **جدول زمني شهري تفاعلي (Monthly Timeline View):**
+  - تصفح الأقساط شهراً بشهر مع إجمالي المطلوب سداده في كل شهر.
+  - تنبيهات واضحة بالألوان للأقساط المتأخرة والقادمة خلال الشهر.
+  - زر سداد سريع للقسط بضغطة واحدة من الحساب المفضل.
+
+### 5. 💳 حماية البطاقات الائتمانية من الغرامات والفوائد (Credit Cards Watchlist)
+- **توضيح وتفريق كامل للمصطلحات الائتمانية لمنع الالتباس:**
+  - **المديونية الحالية المطلوب سدادها (Current Owed):** المبلغ المستحق عليك فعلياً للبنك في الدورة الحالية (يُدخل كرقم موجب ويُعالج التطبيق رصيده تلقائياً).
+  - **الحد الائتماني الإجمالي (Credit Limit):** إجمالي المبلغ المتاح لك استدانته من البنك.
+  - **يوم السداد الشهري (Payment Due Day):** الموعد النهائي الشهري لسداد مستحقات الكارت لتجنب فوائد التأخير وغرامات البنك.
+  - **يوم قطع كشف الحساب (Statement Cutoff Day):** اليوم الذي يقفل فيه البنك مشتريات الشهر لإصدار الفاتورة.
+- **عداد تنازلي وتنبيهات بالألوان:** بطاقات مستحقة عاجلاً (أحمر)، قريباً (أصفر)، أو مسددة بالكامل (أخضر)، مع زر سداد مباشر للبطاقة بضغطة زر واحدة.
+
+### 6. ⚡ شريط العمليات السريعة (Quick Action Toolbar)
+- شريط إجراءات سريعة في أعلى لوحة التحكم بضغطة زر واحدة عبر نوافذ تفاعلية منبثقة (`<dialog>`):
+  - 🤝 **سداد دين أمانة:** مع حاسبة تحويل العملات وتحديد كامل المبلغ المتبقي.
+  - 📥 **تحصيل مستحق لي:** استرداد الأموال المعلقة بالخارج وإيداعها في الحساب المختار.
+  - 💳 **سداد بطاقة ائتمانية:** تحويل فوري من البنك أو المحفظة إلى الكارت.
+  - 🛒 **مصروف سريع:** تسجيل مصاريفك اليومية بأسرع وقت.
+  - 💰 **دخل جديد:** إضافة إيراد أو مرتب لحساب محدد.
+  - 🔄 **تحويل رصيد:** نقل أموال بين الحسابات مع دعم أسعار الصرف المختلفة.
+
+### 7. 📊 رسوم بيانية وإحصائيات مالية لحظية (Analytics & Charts)
+- رسوم بيانية SVG تفاعلية خفيفة وسريعة التحميل بدون مكتبات ثقيلة:
+  - **التدفق النقدي الصافي (Cashflow):** مقارنة شهرية وأسبوعية بين الدخل، المصروفات، ومبالغ سداد الديون.
+  - **منحنى إطفاء الديون (Debt Burn-down Curve):** تتبع مسار هبوط المديونيات حتى الوصول إلى الصفر.
+  - **توزيع النفقات حسب التصنيف (Category Breakdown):** أشرطة تقدم ونسب مئوية لأهم بنود الصرف.
+  - تبديل فوري وسلس بين فترات: **أسبوع (Week) | شهر (Month) | سنة (Year) | الكل (All)**.
+
+### 8. 📱 واجهة مريحة وكبيرة تناسب الاستخدام اليومي (Comfortable UI/UX)
+- خطوط وأزرار وكروت كبيرة ومريحة للعين، مع هوامش لمس مناسبة للهواتف المحمولة.
+- إرشادات وشروحات عربية واضحة ومبسطة لكل نوع حساب ولكل نوع معاملة لتجنب أي حيرة أثناء الاستخدام.
+- دعم كامل للغة العربية والاتجاه من اليمين لليسار (RTL).
+
+---
+
+## 🚀 التشغيل لأول مرة (First Run)
 
 ```bash
 cd ~/Documents/Balla_Finance
-npm run build     # only needed once, or after code changes
+npm run build     # يتم بناؤه مرة واحدة أو بعد أي تعديل كود
 npm start
 ```
 
-Open **http://localhost:3210** — you'll be asked to set your PIN, then create
-your accounts with today's real balances as *opening balances*.
+افتح المتصفح على: **http://localhost:3210**  
+- سيُطلب منك تعيين رمز PIN لحماية التطبيق.
+- بعد ذلك يمكنك إضافة حساباتك وأشخاص الأمانات وبدء التتبع مباشرة.
 
-## Access from your phone / other devices at home
+---
 
-The server listens on your whole home network. Find your Mac's IP
-(System Settings → Network, e.g. `192.168.1.10`) and open:
+## 📱 الدخول من الموبايل أو أجهزة المنزل
+
+الخادم يستمع على شبكتك المنزلية بالكامل. لمعرفة عنوان الآي بي الخاص بجهاز الماك:
+(System Settings → Network، مثلاً `192.168.1.10`) ثم افتح على هاتفك:
 
 ```
 http://192.168.1.10:3210
 ```
 
-Tip: give your Mac a static IP in your router settings so the address never
-changes, and "Add to Home Screen" in Safari on your phone for an app-like icon.
+> **نصيحة:** في متصفح سفاري على الآيفون اضغط على زر المشاركة ثم **"Add to Home Screen"** لتحصل على أيقونة تطبيق مستقلة وسريعة.
 
-## Start automatically when the Mac boots
+---
+
+## 🔄 التشغيل التلقائي عند إقلاع الماك (Auto-Start)
 
 ```bash
 cp com.balla.finance.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.balla.finance.plist
 ```
 
-To stop auto-start: `launchctl unload ~/Library/LaunchAgents/com.balla.finance.plist`
+لإيقاف التشغيل التلقائي:
+```bash
+launchctl unload ~/Library/LaunchAgents/com.balla.finance.plist
+```
 
-## Backups (important!)
+---
 
-Your entire financial history is the single file `data/balla.db`.
+## 💾 النسخ الاحتياطي واستعادة البيانات (Backups)
 
-- Easiest: **Settings → 💾 Download backup** — save it to iCloud/Drive regularly.
-- To restore: stop the server, replace `data/balla.db` with your backup, start again.
+تاريخك المالي بالكامل محفوظ داخل ملف وحيد هو: `data/balla.db`.
 
-## Reset everything
+- **النسخ الاحتياطي:** من داخل التطبيق ادخل على **الإعدادات (Settings) → 💾 تحميل نسخة احتياطية من قاعدة البيانات** واحتفظ بها على Google Drive أو iCloud.
+- **استعادة البيانات:** أوقف الخادم، استبدل ملف `data/balla.db` بنسختك الاحتياطية، ثم أعد تشغيل التطبيق.
 
-Stop the server, delete `data/balla.db` (and `balla.db-wal` / `balla.db-shm` if
-present), start again — you'll get the fresh setup screen.
+---
 
-## Tech notes (for future changes)
+## 🛠️ البنية التقنية (Tech Stack)
 
-- Next.js 15 (App Router, TypeScript) + Tailwind CSS 4 + better-sqlite3.
-- Schema + seeds: `src/lib/db.ts` (tables auto-create on first run).
-- All balances are **derived** from transactions — nothing stored, so edits and
-  deletes can never corrupt totals. Money is stored as integer minor units.
-- Balance/ledger/report queries: `src/lib/queries.ts`. Server actions:
-  `src/app/actions/*`. Pages: `src/app/(app)/*`.
-- Dev mode: `npm run dev` (also on port 3210).
+- **Framework:** Next.js 15 (App Router, Server Actions, TypeScript)
+- **Styling:** Tailwind CSS 4 + Pure Modern CSS
+- **Database:** SQLite عبر `better-sqlite3` (WAL Mode & Foreign Keys Enabled)
+- **Financial Arithmetic:** تخزين المبالغ كوحدات فرعية صحيحة (Minor Units / Piastres / Cents) لمنع أي أخطاء تقريب حسابي (Floating-point precision errors).
+- **Architecture:** كافة الأرصدة التراكمية مستنتجة ومحسوبة ديناميكياً (Derived Balances) بناءً على حركات الإيداع والخصم والسداد لضمان اتساق وسلامة البيانات 100%.

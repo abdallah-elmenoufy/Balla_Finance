@@ -1,109 +1,146 @@
 import Link from "next/link";
 import { requireAuth } from "@/lib/auth";
-import { getAccounts, getPlans } from "@/lib/queries";
+import { getAccounts, getCurrencies, getMonthlyInstallmentsSchedule, getPlans } from "@/lib/queries";
 import { createPlan } from "@/app/actions/bnpl";
 import { fmtMoney, todayISO } from "@/lib/money";
+import BnplPlanForm from "@/components/BnplPlanForm";
+import BnplMonthlySchedule from "@/components/BnplMonthlySchedule";
 
 export const dynamic = "force-dynamic";
 
 export default async function BnplPage() {
   await requireAuth();
   const plans = getPlans();
-  const bnplAccounts = getAccounts().filter((a) => a.type === "bnpl");
+  const allAccounts = getAccounts();
+  const bnplAccounts = allAccounts.filter((a) => a.type === "bnpl");
+  const fundingAccounts = allAccounts.filter((a) => a.type !== "bnpl");
+  const currencies = getCurrencies();
+  const schedule = getMonthlyInstallmentsSchedule();
   const today = todayISO();
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">أقساط — BNPL Plans</h1>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
+            خدمات وخطط التقسيط (BNPL & Installments)
+          </h1>
+          <p className="text-sm text-stone-500 mt-1">
+            متابعة دقيقة لأقساط فاليو (Valu)، سهولة، كونتكت، أمان، وجدول استحقاق كل قسط شهرياً لتفادي أي نسيان
+          </p>
+        </div>
+      </div>
 
       {bnplAccounts.length === 0 ? (
-        <div className="card p-4 text-sm text-stone-600">
-          First create a BNPL account (Valu, Souhoola, Tru…) on the{" "}
-          <Link href="/accounts" className="text-emerald-700 underline">Accounts page</Link>{" "}
-          with type <b>BNPL أقساط</b>, then add plans here.
+        <div className="card p-5 text-base text-stone-700 bg-amber-50/60 border-amber-200">
+          لم تسجل جهة تقسيط بعد. أولاً أضف جهة تقسيط (مثل فاليو أو سهولة) في{" "}
+          <Link href="/accounts" className="text-emerald-700 underline font-bold">
+            صفحة الحسابات والبطاقات
+          </Link>{" "}
+          باختيار نوع <b>خدمات أقساط (BNPL)</b>، ثم أنشئ خطة التقسيط هنا.
         </div>
       ) : (
-        <details className="card p-4">
-          <summary className="cursor-pointer font-medium text-emerald-800">
-            ➕ New plan خطة تقسيط جديدة
+        <details className="card p-5 border-purple-300 shadow-sm">
+          <summary className="cursor-pointer font-bold text-purple-900 text-base sm:text-lg flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <span>➕</span>
+              <span>إضافة خطة تقسيط جديدة مع خيار تخصيص الأقساط (New Plan)</span>
+            </span>
+            <span className="text-xs text-stone-400 font-normal">انقر لإدخال التفاصيل</span>
           </summary>
-          <form action={createPlan} className="mt-4 grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Provider الجهة</label>
-              <select name="account_id" className="input" required>
-                {bnplAccounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.emoji ?? "🧾"} {a.name} ({a.currency})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label">What did you buy? المشتريات</label>
-              <input name="description" dir="auto" required className="input" placeholder="موبايل / تكييف / …" />
-            </div>
-            <div>
-              <label className="label">Purchase date</label>
-              <input name="purchase_date" type="date" defaultValue={today} className="input" required />
-            </div>
-            <div>
-              <label className="label">Price المبلغ الأصلي</label>
-              <input name="principal" inputMode="decimal" required className="input" placeholder="0.00" />
-            </div>
-            <div>
-              <label className="label">Total fees/interest المصاريف (optional)</label>
-              <input name="fees_total" inputMode="decimal" className="input" placeholder="0.00" />
-            </div>
-            <div>
-              <label className="label"># of installments عدد الأقساط</label>
-              <input name="installment_count" type="number" min={1} max={60} required className="input" placeholder="12" />
-            </div>
-            <div>
-              <label className="label">First installment due date</label>
-              <input name="first_due_date" type="date" required className="input" />
-            </div>
-            <div className="col-span-2">
-              <button className="btn w-full">Create plan</button>
-            </div>
-          </form>
+          <div className="mt-5 pt-4 border-t border-stone-100">
+            <BnplPlanForm
+              accounts={bnplAccounts}
+              currencies={currencies}
+              action={createPlan}
+            />
+          </div>
         </details>
       )}
 
-      {plans.length === 0 && (
-        <p className="text-sm text-stone-500 py-8 text-center">No BNPL plans yet</p>
+      {/* Monthly Installment Timeline & Calendar Tracker */}
+      {schedule.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg sm:text-xl font-black text-stone-900 flex items-center gap-2">
+              <span>📅</span>
+              <span>جدول متابعة الأقساط الشهرية (كل شهر على حدة)</span>
+            </h2>
+            <span className="text-xs text-stone-500 font-semibold">متابعة شهرية دقيقة</span>
+          </div>
+          <BnplMonthlySchedule schedule={schedule} fundingAccounts={fundingAccounts} />
+        </div>
       )}
 
-      <div className="grid gap-3">
-        {plans.map((p) => {
-          const remaining = p.total - p.paid_amount;
-          const pct = p.total > 0 ? Math.round((p.paid_amount / p.total) * 100) : 0;
-          const overdue = p.next_due !== null && p.next_due < today;
-          return (
-            <Link key={p.id} href={`/bnpl/${p.id}`} className="card p-4 hover:border-emerald-600 transition-colors">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="min-w-0">
-                  <div dir="auto" className="font-semibold">{p.description}</div>
-                  <div className="text-xs text-stone-500">
-                    {p.account_name} · {p.paid_count}/{p.installment_count} paid
-                    {p.next_due && (
-                      <span className={overdue ? "text-red-600 font-semibold" : "text-amber-600"}>
-                        {" "}· next due {p.next_due}{overdue ? " ⚠️ overdue" : ""}
-                      </span>
-                    )}
+      {plans.length === 0 && (
+        <p className="text-base text-stone-400 py-10 text-center card p-6">لا توجد خطط تقسيط مسجلة حالياً</p>
+      )}
+
+      {/* Plans List */}
+      {plans.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg sm:text-xl font-black text-stone-900 flex items-center gap-2">
+            <span>🧾</span>
+            <span>خطط التقسيط والمشتريات الحالية ({plans.length})</span>
+          </h2>
+          <div className="grid gap-4">
+            {plans.map((p) => {
+              const remaining = p.total - p.paid_amount;
+              const pct = p.total > 0 ? Math.round((p.paid_amount / p.total) * 100) : 0;
+              const overdue = p.next_due !== null && p.next_due < today;
+
+              return (
+                <Link
+                  key={p.id}
+                  href={`/bnpl/${p.id}`}
+                  className="card p-5 hover:border-purple-600 hover:shadow-md transition-all group bg-white"
+                >
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="min-w-0">
+                      <div dir="auto" className="font-bold text-stone-900 text-lg group-hover:text-purple-800 transition-colors flex items-center gap-2">
+                        <span>🧾</span>
+                        <span>{p.description}</span>
+                      </div>
+                      <div className="text-sm text-stone-500 mt-1">
+                        جهة التمويل: <b>{p.account_name}</b> · تم سداد {p.paid_count} من {p.installment_count} قسط
+                        {p.next_due && (
+                          <span className={`mr-2 font-bold ${overdue ? "text-red-600" : "text-amber-700"}`}>
+                            · القسط القادم: {p.next_due} {overdue ? "⚠️ متأخر!" : ""}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="text-right whitespace-nowrap">
+                      <div className="text-xl font-black text-red-600 font-mono">
+                        {fmtMoney(remaining, p.currency)}
+                      </div>
+                      <div className="text-xs text-stone-400 mt-0.5">
+                        متبقي من إجمالي {fmtMoney(p.total, p.currency)}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold text-red-600">{fmtMoney(remaining, p.currency)} left</div>
-                  <div className="text-xs text-stone-500">of {fmtMoney(p.total, p.currency)}</div>
-                </div>
-              </div>
-              <div className="mt-2 h-2 rounded-full bg-stone-200 overflow-hidden">
-                <div className="h-full bg-emerald-600" style={{ width: `${pct}%` }} />
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+
+                  {/* Progress Bar */}
+                  <div className="mt-4 space-y-1">
+                    <div className="flex justify-between text-xs text-stone-500">
+                      <span>تم سداد: {pct}%</span>
+                      <span>المدفوع: {fmtMoney(p.paid_amount, p.currency)}</span>
+                    </div>
+                    <div className="h-2.5 rounded-full bg-stone-100 overflow-hidden">
+                      <div
+                        className="h-full bg-purple-700 rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

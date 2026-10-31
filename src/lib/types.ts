@@ -12,16 +12,72 @@ export type AccountType =
   | "debit_card"
   | "credit_card"
   | "bnpl"
+  | "receivable"
   | "other";
 
-export const ACCOUNT_TYPES: { value: AccountType; label: string; emoji: string }[] = [
-  { value: "cash", label: "Cash كاش", emoji: "💵" },
-  { value: "mobile_wallet", label: "Mobile Wallet محفظة", emoji: "📱" },
-  { value: "bank", label: "Bank Account حساب بنكي", emoji: "🏦" },
-  { value: "debit_card", label: "Debit / Visa Card", emoji: "💳" },
-  { value: "credit_card", label: "Credit Card بطاقة ائتمان", emoji: "🟠" },
-  { value: "bnpl", label: "BNPL أقساط (Valu, Souhoola…)", emoji: "🧾" },
-  { value: "other", label: "Other أخرى", emoji: "📦" },
+export const ACCOUNT_TYPES: {
+  value: AccountType;
+  label: string;
+  emoji: string;
+  description: string;
+  isCredit: boolean;
+}[] = [
+  {
+    value: "cash",
+    label: "كاش ونقود ورقية (Cash)",
+    emoji: "💵",
+    description: "النقود الورقية الحقيقية في جيبك، محفظتك، أو في البيت (أموال تملكها فعلياً)",
+    isCredit: false,
+  },
+  {
+    value: "mobile_wallet",
+    label: "محفظة إلكترونية (Mobile Wallet)",
+    emoji: "📱",
+    description: "فودافون كاش، إنستاباي، أورنج كاش، إي آند، وي باي (رصيدك الفعلي المتاح للتحويل)",
+    isCredit: false,
+  },
+  {
+    value: "bank",
+    label: "حساب بنكي (Bank Account)",
+    emoji: "🏦",
+    description: "حساب جاري أو توفير في البنك (الأهلي، مصر، CIB...) يمثل رصيدك الإيجابي",
+    isCredit: false,
+  },
+  {
+    value: "debit_card",
+    label: "بطاقة خصم مباشر (Debit / Visa Card)",
+    emoji: "💳",
+    description: "كارت الفيزا/ميزة المربوط مباشرة بحسابك البنكي، لا يفرض عليك ديوناً أو فوائد",
+    isCredit: false,
+  },
+  {
+    value: "credit_card",
+    label: "بطاقة ائتمان / مشتريات (Credit Card)",
+    emoji: "🟠",
+    description: "بطاقة استدانة يسلفك البنك منها وتلتزم بسداد المديونية في موعد محدد لتجنب الفوائد",
+    isCredit: true,
+  },
+  {
+    value: "bnpl",
+    label: "خدمات أقساط (BNPL - Valu, Souhoola...)",
+    emoji: "🧾",
+    description: "حساب لجهات التقسيط (فاليو، سهولة، كونتكت، أمان) لمتابعة أقساط مشترياتك المجدولة شهرياً",
+    isCredit: true,
+  },
+  {
+    value: "receivable",
+    label: "أموال مستحقة بالخارج (فلوس ليا برة)",
+    emoji: "🤝",
+    description: "حساب لتتبع الأموال والديون التي سلّفتها للآخرين والمستحقة لك في ذمتهم وتنتظر تحصيلها",
+    isCredit: false,
+  },
+  {
+    value: "other",
+    label: "حساب آخر (Other)",
+    emoji: "📦",
+    description: "أي حساب أو محفظة مالية أخرى تريد تتبع رصيدها",
+    isCredit: false,
+  },
 ];
 
 export interface Account {
@@ -49,6 +105,7 @@ export interface Person {
   note: string | null;
   initial_debt: number;
   initial_currency: string;
+  initial_type: "debt" | "receivable";
   archived: number;
   created_at: string;
 }
@@ -147,6 +204,30 @@ export interface OverallDebtSummary {
   overall_progress: number;
   active_debts_count: number;
   settled_debts_count: number;
+}
+
+export interface PersonReceivableSummary {
+  person_id: number;
+  name: string;
+  note: string | null;
+  currency: string;
+  initial_receivable: number;
+  additional_lent: number;
+  total_receivable_original: number;
+  collected: number;
+  remaining: number;
+  progress: number;
+  is_settled: boolean;
+}
+
+export interface OverallReceivableSummary {
+  currency: string;
+  total_receivable_original: number;
+  total_collected: number;
+  total_remaining: number;
+  overall_progress: number;
+  active_receivables_count: number;
+  settled_receivables_count: number;
 }
 
 export interface CreditCardStatus {

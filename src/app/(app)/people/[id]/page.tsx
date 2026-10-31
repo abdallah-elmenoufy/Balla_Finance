@@ -23,11 +23,18 @@ export default async function PersonPage({
 
   const cur = person.initial_currency || "EGP";
   const initial = person.initial_debt || 0;
+  const isReceivable = person.initial_type === "receivable";
 
-  let repaid = 0;
+  let repaidOrCollected = 0;
   for (const e of ledger) {
-    if (e.txn.type === "person_out" || (e.txn.type === "expense" && e.txn.person_id)) {
-      repaid += e.txn.person_amount ?? 0;
+    if (isReceivable) {
+      if (e.txn.type === "person_in") {
+        repaidOrCollected += e.txn.person_amount ?? 0;
+      }
+    } else {
+      if (e.txn.type === "person_out" || (e.txn.type === "expense" && e.txn.person_id)) {
+        repaidOrCollected += e.txn.person_amount ?? 0;
+      }
     }
   }
 
@@ -36,20 +43,23 @@ export default async function PersonPage({
     finalBalances.set(e.txn.person_currency ?? cur, e.balance);
   }
   if (!finalBalances.has(cur)) {
-    finalBalances.set(cur, initial);
+    finalBalances.set(cur, isReceivable ? -initial : initial);
   }
 
-  const remaining = Math.max(0, finalBalances.get(cur) ?? 0);
+  const remaining = Math.max(0, Math.abs(finalBalances.get(cur) ?? initial));
   const totalOriginal = Math.max(initial, initial + Math.max(0, remaining - initial));
   const progress =
-    totalOriginal > 0 ? Math.min(100, Math.round((repaid / totalOriginal) * 100)) : 100;
+    totalOriginal > 0
+      ? Math.min(100, Math.round((repaidOrCollected / totalOriginal) * 100))
+      : 100;
   const isSettled = remaining === 0 && totalOriginal > 0;
 
   return (
     <div className="space-y-4">
       <div className="text-sm text-stone-500">
-        <Link href="/people" className="hover:underline">
-          ← الأمانات والديون العائلية
+        <Link href="/people" className="hover:underline flex items-center gap-1 font-semibold text-emerald-800">
+          <span>←</span>
+          <span>الرجوع إلى قائمة الأشخاص والديون</span>
         </Link>
       </div>
 
@@ -58,17 +68,24 @@ export default async function PersonPage({
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🤝</span>
+              <span className="text-2xl">{isReceivable ? "💼" : "🤝"}</span>
               <h1 dir="auto" className="text-xl sm:text-2xl font-bold text-stone-900">
                 {person.name}
               </h1>
+              <span
+                className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
+                  isReceivable ? "bg-teal-100 text-teal-800" : "bg-amber-100 text-amber-900"
+                }`}
+              >
+                {isReceivable ? "أموال مستحقة لك عنده" : "أمانة ودين في ذمتك له"}
+              </span>
               {isSettled ? (
                 <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full">
                   خالص بالكامل ✓
                 </span>
               ) : (
                 <span className="text-xs bg-amber-100 text-amber-800 font-bold px-2.5 py-0.5 rounded-full">
-                  {progress}% تم سداده
+                  {progress}% {isReceivable ? "تم تحصيله" : "تم سداده"}
                 </span>
               )}
             </div>
@@ -82,13 +99,19 @@ export default async function PersonPage({
           <div className="text-right">
             <div
               className={`text-2xl font-black ${
-                isSettled ? "text-emerald-700" : "text-amber-800"
+                isSettled ? "text-emerald-700" : isReceivable ? "text-emerald-800" : "text-amber-800"
               }`}
             >
               {fmtMoney(remaining, cur)}
             </div>
             <div className="text-xs text-stone-500 mt-0.5">
-              {isSettled ? "تم سداد الدين بالكامل" : "المتبقي عليك سداده له"}
+              {isSettled
+                ? isReceivable
+                  ? "تم تحصيل المبلغ بالكامل"
+                  : "تم سداد الدين بالكامل"
+                : isReceivable
+                  ? "المتبقي لك عنده بانتظار تحصيله"
+                  : "المتبقي عليك سداده له"}
             </div>
           </div>
         </div>
@@ -96,12 +119,20 @@ export default async function PersonPage({
         {/* Progress Bar */}
         <div className="space-y-1.5 pt-2 border-t border-stone-100">
           <div className="flex justify-between text-xs text-stone-500">
-            <span>تم سداده: <b>{fmtMoney(repaid, cur)}</b></span>
-            <span>الدين الأصلي: <b>{fmtMoney(totalOriginal, cur)}</b></span>
+            <span>
+              {isReceivable ? "تم تحصيله: " : "تم سداده: "}
+              <b>{fmtMoney(repaidOrCollected, cur)}</b>
+            </span>
+            <span>
+              {isReceivable ? "المبلغ الأصلي المستحق: " : "الدين الأصلي: "}
+              <b>{fmtMoney(totalOriginal, cur)}</b>
+            </span>
           </div>
           <div className="w-full bg-stone-100 h-2 rounded-full overflow-hidden">
             <div
-              className="bg-emerald-600 h-full rounded-full transition-all duration-500"
+              className={`h-full rounded-full transition-all duration-500 ${
+                isReceivable ? "bg-teal-600" : "bg-emerald-600"
+              }`}
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -127,8 +158,19 @@ export default async function PersonPage({
               <label className="label">الملاحظة / صلة القرابة</label>
               <input name="note" defaultValue={person.note ?? ""} dir="auto" className="input" />
             </div>
+            <div className="col-span-2">
+              <label className="label">نوع الذمة المالية</label>
+              <select
+                name="initial_type"
+                defaultValue={person.initial_type ?? "debt"}
+                className="input font-semibold"
+              >
+                <option value="debt">🔴 أنا مدين له (دين / أمانة في ذمتي واجب سدادها له)</option>
+                <option value="receivable">🟢 هو مدين لي (سلفة / أموال مستحقة لي في ذمته بانتظار تحصيلها)</option>
+              </select>
+            </div>
             <div>
-              <label className="label">الدين الأصلي السابق</label>
+              <label className="label">الدين أو المبلغ الأصلي السابق</label>
               <input
                 name="initial_debt"
                 type="number"

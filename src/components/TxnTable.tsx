@@ -16,21 +16,39 @@ function amountCell(t: TxnRow) {
   switch (t.type) {
     case "income":
       return <span className="text-emerald-700 font-bold">+{fmtMoney(t.amount, cur)}</span>;
-    case "person_in":
+    case "person_in": {
+      const isCross =
+        t.person_currency && t.account_currency && t.person_currency !== t.account_currency;
       return (
-        <span className="text-amber-800 font-bold">
-          +{fmtMoney(t.person_amount ?? t.amount, t.person_currency ?? cur)}
-        </span>
+        <div className="flex flex-col items-end">
+          <span className="text-amber-800 font-bold">+{fmtMoney(t.amount, cur)}</span>
+          {isCross && (
+            <span className="text-[11px] font-bold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200 mt-0.5">
+              💱 {fmtMoney(t.person_amount ?? 0, t.person_currency!)} أمانة جديدة
+            </span>
+          )}
+        </div>
       );
-    case "person_out":
+    }
+    case "person_out": {
+      const isCross =
+        t.person_currency && t.account_currency && t.person_currency !== t.account_currency;
       return (
-        <span className="text-purple-700 font-bold flex items-center justify-end gap-1">
-          <span className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded-sm">
-            سداد دين
+        <div className="flex flex-col items-end">
+          <span className="text-purple-700 font-bold flex items-center justify-end gap-1">
+            <span className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded-sm">
+              سداد دين
+            </span>
+            <span>−{fmtMoney(t.amount, cur)}</span>
           </span>
-          <span>−{fmtMoney(t.amount, cur)}</span>
-        </span>
+          {isCross && (
+            <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200 mt-0.5">
+              💱 خصم {fmtMoney(t.person_amount ?? 0, t.person_currency!)} من الدين
+            </span>
+          )}
+        </div>
       );
+    }
     case "expense":
       return (
         <span className="text-red-600 font-semibold">

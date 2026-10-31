@@ -8,18 +8,24 @@ import type {
   CreditCardStatus,
   Currency,
   OverallDebtSummary,
+  OverallReceivableSummary,
   Person,
   PersonDebtSummary,
+  PersonReceivableSummary,
 } from "@/lib/types";
 import QuickActionToolbar, { type QuickPayTarget } from "./QuickActionToolbar";
 import DebtJourneyCard from "./DebtJourneyCard";
+import ReceivablesHub from "./ReceivablesHub";
 import CreditCardsWatchlist from "./CreditCardsWatchlist";
 import AnalyticsCharts from "./AnalyticsCharts";
 import CelebrationToast from "./CelebrationToast";
 
 export default function DashboardClient({
   overallDebt,
+  overallDebts,
   personDebts,
+  receivables = [],
+  overallReceivables = [],
   creditCards,
   accounts,
   people,
@@ -28,7 +34,10 @@ export default function DashboardClient({
   dataByPeriod,
 }: {
   overallDebt: OverallDebtSummary;
+  overallDebts?: OverallDebtSummary[];
   personDebts: PersonDebtSummary[];
+  receivables?: PersonReceivableSummary[];
+  overallReceivables?: OverallReceivableSummary[];
   creditCards: CreditCardStatus[];
   accounts: AccountWithBalance[];
   people: Person[];
@@ -43,12 +52,33 @@ export default function DashboardClient({
 }) {
   const [quickPayTarget, setQuickPayTarget] = useState<QuickPayTarget | null>(null);
 
-  function handleQuickPayPerson(personId: number, personName: string, remainingAmount: number) {
+  function handleQuickPayPerson(
+    personId: number,
+    personName: string,
+    remainingAmount: number,
+    currency?: string
+  ) {
     setQuickPayTarget({
       type: "person",
       id: personId,
       name: personName,
       amount: remainingAmount,
+      currency,
+    });
+  }
+
+  function handleQuickCollectPerson(
+    personId: number,
+    personName: string,
+    remainingAmount: number,
+    currency?: string
+  ) {
+    setQuickPayTarget({
+      type: "collect",
+      id: personId,
+      name: personName,
+      amount: remainingAmount,
+      currency,
     });
   }
 
@@ -71,6 +101,7 @@ export default function DashboardClient({
         accounts={accounts}
         people={people}
         personDebts={personDebts}
+        receivables={receivables}
         creditCards={creditCards}
         categories={categories}
         currencies={currencies}
@@ -80,8 +111,16 @@ export default function DashboardClient({
       {/* Hero Section: Debt Repayment Journey (الأمانات والديون العائلية) */}
       <DebtJourneyCard
         overallDebt={overallDebt}
+        overallDebts={overallDebts}
         personDebts={personDebts}
         onQuickPayPerson={handleQuickPayPerson}
+      />
+
+      {/* Receivables Section: Money Owed to User by Others (أموال مستحقة لك بالخارج) */}
+      <ReceivablesHub
+        receivables={receivables}
+        overallReceivables={overallReceivables}
+        onQuickCollectPerson={handleQuickCollectPerson}
       />
 
       {/* Credit Card Penalty Prevention Hub (حماية البطاقات من الغرامات) */}

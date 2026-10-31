@@ -9,9 +9,11 @@ import type {
   CreditCardStatus,
   Currency,
   OverallDebtSummary,
+  OverallReceivableSummary,
   Person,
   PersonBalance,
   PersonDebtSummary,
+  PersonReceivableSummary,
   Txn,
 } from "./types";
 
@@ -100,7 +102,8 @@ export function getPersonBalances(): PersonBalance[] {
   for (const p of people) {
     if (p.initial_debt > 0) {
       const key = `${p.id}:${p.initial_currency || "EGP"}`;
-      map.set(key, p.initial_debt);
+      const sign = p.initial_type === "receivable" ? -1 : 1;
+      map.set(key, sign * p.initial_debt);
     }
   }
   for (const r of rows) {
@@ -251,7 +254,8 @@ export function personLedger(
     .all(...params) as TxnRow[];
   const balances = new Map<string, number>(opening ?? []);
   if (!opening && person && person.initial_debt > 0) {
-    balances.set(person.initial_currency || "EGP", person.initial_debt);
+    const sign = person.initial_type === "receivable" ? -1 : 1;
+    balances.set(person.initial_currency || "EGP", sign * person.initial_debt);
   }
   const entries: LedgerEntry[] = [];
   for (const t of txns) {
@@ -295,7 +299,8 @@ export function personBalanceBefore(personId: number, date: string): Map<string,
     .all(personId, date) as { currency: string; balance: number }[];
   const map = new Map<string, number>();
   if (person && person.initial_debt > 0) {
-    map.set(person.initial_currency || "EGP", person.initial_debt);
+    const sign = person.initial_type === "receivable" ? -1 : 1;
+    map.set(person.initial_currency || "EGP", sign * person.initial_debt);
   }
   for (const r of rows) {
     map.set(r.currency, (map.get(r.currency) ?? 0) + r.balance);
@@ -359,6 +364,64 @@ export function upcomingInstallments(withinDays = 30): DueInstallment[] {
     .all(limit) as DueInstallment[];
 }
 
+export const ARABIC_DAYS = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+export const ARABIC_MONTHS = [
+  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+];
+
+export interface MonthlyInstallmentGroup {
+  month: string;
+  label: string;
+  totalDue: number;
+  totalPaid: number;
+  currency: string;
+  installments: (BnplInstallment & {
+    plan_description: string;
+    account_name: string;
+    currency: string;
+  })[];
+}
+
+export function getMonthlyInstallmentsSchedule(): MonthlyInstallmentGroup[] {
+  const rows = db()
+    .prepare(
+      `SELECT i.*, pl.description AS plan_description, a.name AS account_name, a.currency AS currency
+       FROM bnpl_installments i
+       JOIN bnpl_plans pl ON pl.id = i.plan_id
+       JOIN accounts a ON a.id = pl.account_id
+       ORDER BY i.due_date, i.id`
+    )
+    .all() as (BnplInstallment & { plan_description: string; account_name: string; currency: string })[];
+
+  const map = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const month = r.due_date.slice(0, 7);
+    if (!map.has(month)) map.set(month, []);
+    map.get(month)!.push(r);
+  }
+
+  const groups: MonthlyInstallmentGroup[] = [];
+  for (const [month, items] of map.entries()) {
+    const cur = items[0]?.currency || "EGP";
+    const totalDue = items.filter((i) => i.status === "pending").reduce((sum, i) => sum + i.amount, 0);
+    const totalPaid = items.filter((i) => i.status === "paid").reduce((sum, i) => sum + i.amount, 0);
+    const [y, m] = month.split("-");
+    const mNum = Number(m) - 1;
+    const arabicMonth = ARABIC_MONTHS[mNum] || month;
+    groups.push({
+      month,
+      label: `${arabicMonth} ${y}`,
+      totalDue,
+      totalPaid,
+      currency: cur,
+      installments: items,
+    });
+  }
+
+  return groups.sort((a, b) => a.month.localeCompare(b.month));
+}
+
 // ---------- Reports ----------
 
 export interface CategoryTotal {
@@ -412,7 +475,7 @@ export function monthlyTotals(month: string): MonthTotals[] {
 // ---------- Debt Management (الأمانات والديون العائلية) ----------
 
 export function getPersonDebtSummaries(): PersonDebtSummary[] {
-  const people = getPeople();
+  const people = getPeople().filter((p) => p.initial_type !== "receivable");
   const result: PersonDebtSummary[] = [];
 
   for (const p of people) {
@@ -500,6 +563,113 @@ export function getOverallDebtSummary(targetCurrency = "EGP"): OverallDebtSummar
   };
 }
 
+export function getOverallDebtSummaries(): OverallDebtSummary[] {
+  const summaries = getPersonDebtSummaries();
+  const currencies = Array.from(new Set(summaries.map((s) => s.currency || "EGP")));
+  if (currencies.length === 0) currencies.push("EGP");
+  return currencies.map((c) => getOverallDebtSummary(c));
+}
+
+// ---------- Receivables Management (أموال مستحقة لك بالخارج / فلوس ليا برة) ----------
+
+export function getPersonReceivableSummaries(): PersonReceivableSummary[] {
+  const people = getPeople().filter((p) => p.initial_type === "receivable");
+  const result: PersonReceivableSummary[] = [];
+
+  for (const p of people) {
+    const cur = p.initial_currency || "EGP";
+    const initial = p.initial_debt || 0;
+
+    // Money lent to them / paid on their behalf
+    const addRow = db()
+      .prepare(
+        `SELECT SUM(person_amount) AS total FROM transactions
+         WHERE person_id = ? AND person_currency = ? AND (type = 'person_out' OR (type = 'expense' AND person_id IS NOT NULL))`
+      )
+      .get(p.id, cur) as { total: number | null };
+    const additional_lent = addRow?.total ?? 0;
+
+    // Money collected / received back from them
+    const collectRow = db()
+      .prepare(
+        `SELECT SUM(person_amount) AS total FROM transactions
+         WHERE person_id = ? AND person_currency = ? AND type = 'person_in'`
+      )
+      .get(p.id, cur) as { total: number | null };
+    const collected = collectRow?.total ?? 0;
+
+    const total_receivable_original = initial + additional_lent;
+    const remaining = Math.max(0, total_receivable_original - collected);
+    const progress =
+      total_receivable_original > 0
+        ? Math.min(100, Math.round((collected / total_receivable_original) * 100))
+        : collected > 0
+          ? 100
+          : 0;
+    const is_settled = remaining === 0 && total_receivable_original > 0;
+
+    result.push({
+      person_id: p.id,
+      name: p.name,
+      note: p.note,
+      currency: cur,
+      initial_receivable: initial,
+      additional_lent,
+      total_receivable_original,
+      collected,
+      remaining,
+      progress,
+      is_settled,
+    });
+  }
+
+  return result.sort((a, b) => {
+    if (a.is_settled !== b.is_settled) return a.is_settled ? 1 : -1;
+    return b.remaining - a.remaining;
+  });
+}
+
+export function getOverallReceivableSummary(targetCurrency = "EGP"): OverallReceivableSummary {
+  const summaries = getPersonReceivableSummaries().filter((s) => s.currency === targetCurrency);
+  let total_receivable_original = 0;
+  let total_collected = 0;
+  let total_remaining = 0;
+  let active_receivables_count = 0;
+  let settled_receivables_count = 0;
+
+  for (const s of summaries) {
+    total_receivable_original += s.total_receivable_original;
+    total_collected += s.collected;
+    total_remaining += s.remaining;
+    if (s.total_receivable_original > 0) {
+      if (s.is_settled) settled_receivables_count++;
+      else active_receivables_count++;
+    }
+  }
+
+  const overall_progress =
+    total_receivable_original > 0
+      ? Math.min(100, Math.round((total_collected / total_receivable_original) * 100))
+      : 0;
+
+  return {
+    currency: targetCurrency,
+    total_receivable_original,
+    total_collected,
+    total_remaining,
+    overall_progress,
+    active_receivables_count,
+    settled_receivables_count,
+  };
+}
+
+export function getOverallReceivableSummaries(): OverallReceivableSummary[] {
+  const summaries = getPersonReceivableSummaries();
+  const currencies = Array.from(new Set(summaries.map((s) => s.currency || "EGP")));
+  if (currencies.length === 0) currencies.push("EGP");
+  return currencies.map((c) => getOverallReceivableSummary(c));
+}
+
 // ---------- Credit Card Watchlist (حماية البطاقات من الغرامات) ----------
 
 export function getCreditCardsStatus(): CreditCardStatus[] {
@@ -577,12 +747,6 @@ export function getCreditCardsStatus(): CreditCardStatus[] {
 }
 
 // ---------- Analytics & Visual Charts (إحصائيات ورسوم بيانية) ----------
-
-const ARABIC_DAYS = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-const ARABIC_MONTHS = [
-  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
-];
 
 export function getAnalyticsData(
   period: "week" | "month" | "year" | "all" = "month",

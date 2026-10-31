@@ -11,8 +11,15 @@ function parseAccountForm(formData: FormData) {
   const type = String(formData.get("type") ?? "other");
   const currency = String(formData.get("currency") ?? "EGP");
   const dec = getCurrency(currency)?.decimals ?? 2;
+  const isCredit = type === "credit_card" || type === "bnpl";
+
   const openingRaw = String(formData.get("opening_balance") ?? "").trim();
-  const opening = openingRaw ? toMinor(openingRaw, dec) : 0;
+  let opening = openingRaw ? toMinor(openingRaw, dec) : 0;
+  // If user entered a positive owed amount for a credit card, store as debt (negative balance)
+  if (isCredit && opening > 0) {
+    opening = -opening;
+  }
+
   const creditRaw = String(formData.get("credit_limit") ?? "").trim();
   const credit_limit = creditRaw ? toMinor(creditRaw, dec) : null;
   const dueRaw = String(formData.get("due_day") ?? "").trim();

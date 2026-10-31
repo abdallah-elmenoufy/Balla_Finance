@@ -7,8 +7,10 @@ import {
   getCreditCardsStatus,
   getCurrencies,
   getOverallDebtSummary,
+  getOverallReceivableSummaries,
   getPeople,
   getPersonDebtSummaries,
+  getPersonReceivableSummaries,
   getTxns,
   upcomingInstallments,
 } from "@/lib/queries";
@@ -29,9 +31,16 @@ export default async function DashboardPage() {
   const today = todayISO();
 
   // Debt & Card status
-  const overallDebt = getOverallDebtSummary("EGP");
   const personDebts = getPersonDebtSummaries();
+  const distinctCurrencies = Array.from(new Set(personDebts.map((p) => p.currency))).filter(Boolean);
+  const debtCurrencies = distinctCurrencies.length > 0 ? distinctCurrencies : ["EGP"];
+  const overallDebts = debtCurrencies.map((c) => getOverallDebtSummary(c));
+  const activeDebtSummary = overallDebts.find((d) => d.total_debt_original > 0) || overallDebts[0];
   const creditCards = getCreditCardsStatus();
+
+  // Receivables status (أموال مستحقة لك بالخارج / فلوس ليك برة)
+  const receivableSummaries = getPersonReceivableSummaries();
+  const overallReceivables = getOverallReceivableSummaries();
 
   // Pre-fetch analytics for all 4 periods for instant tab switching
   const dataByPeriod = {
@@ -78,55 +87,124 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* High-Level Financial Snapshot */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* Available Liquid Cash */}
+      {/* High-Level Financial Snapshot: 4 Pillars */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* 1. Available Liquid Cash */}
         <div className="card p-4 bg-gradient-to-br from-emerald-50 to-white border-emerald-200 shadow-2xs">
-          <div className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
-            <span>💵</span>
-            <span>السيولة النقدية المتاحة (كاش + بنوك + محافظ)</span>
+          <div className="text-xs font-semibold text-emerald-800 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <span>💵</span>
+              <span>السيولة النقدية المتاحة</span>
+            </span>
+            <span className="text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+              كاش ومحافظ
+            </span>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-emerald-700 mt-1">
+          <div className="text-xl sm:text-2xl font-black text-emerald-700 mt-2 font-mono">
             {fmtMoney(liquidTotalEGP, "EGP")}
           </div>
-          <div className="text-[11px] text-stone-500 mt-0.5">
+          <div className="text-[11px] text-stone-500 mt-1">
             في {liquidAccounts.length} حسابات فعلية بحوزتك
           </div>
         </div>
 
-        {/* Total Family Debts Remaining */}
+        {/* 2. Total Family Debts Remaining (Dual-Currency Stacked Display) */}
         <div className="card p-4 bg-gradient-to-br from-amber-50 to-white border-amber-200 shadow-2xs">
-          <div className="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
-            <span>🤝</span>
-            <span>ديون الأمانات العائلية المتبقية</span>
+          <div className="text-xs font-semibold text-amber-900 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <span>🤝</span>
+              <span>ديون الأمانات العائلية المتبقية</span>
+            </span>
+            <span className="text-[11px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-bold">
+              عليك سدادها
+            </span>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-amber-700 mt-1">
-            {fmtMoney(overallDebt.total_remaining, overallDebt.currency)}
+          <div className="mt-2 space-y-1.5">
+            {overallDebts
+              .filter((d) => d.total_debt_original > 0)
+              .map((d) => (
+                <div key={d.currency} className="flex items-baseline justify-between gap-1.5 border-b border-amber-100/60 pb-1 last:border-0 last:pb-0">
+                  <span className="text-lg sm:text-xl font-black text-amber-800 font-mono">
+                    {fmtMoney(d.total_remaining, d.currency)}
+                  </span>
+                  <span className="text-[11px] font-bold text-amber-700">
+                    تم سداد {d.overall_progress}%
+                  </span>
+                </div>
+              ))}
+            {overallDebts.filter((d) => d.total_debt_original > 0).length === 0 && (
+              <div className="text-lg font-bold text-emerald-700">لا توجد ديون عليك بفضل الله</div>
+            )}
           </div>
-          <div className="text-[11px] text-amber-800 font-medium mt-0.5">
-            تم سداد {overallDebt.overall_progress}% حتى الآن ({fmtMoney(overallDebt.total_repaid, overallDebt.currency)})
+          <div className="text-[11px] text-stone-500 mt-1">
+            تُخصم تلقائياً عند السداد (EGP و USD)
           </div>
         </div>
 
-        {/* Credit Card Dues */}
-        <div className="card p-4 bg-gradient-to-br from-red-50 to-white border-red-200 shadow-2xs">
-          <div className="text-xs font-semibold text-red-900 flex items-center gap-1.5">
-            <span>💳</span>
-            <span>مستحقات البطاقات الائتمانية</span>
+        {/* 3. Receivables Owed to You by Others (فلوس ليك برة) */}
+        <div className="card p-4 bg-gradient-to-br from-teal-50 to-white border-teal-200 shadow-2xs">
+          <div className="text-xs font-semibold text-teal-900 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <span>💼</span>
+              <span>أموال مستحقة لك بالخارج</span>
+            </span>
+            <span className="text-[11px] bg-teal-100 text-teal-900 px-2 py-0.5 rounded-full font-bold">
+              قيد التحصيل
+            </span>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-red-600 mt-1">
+          <div className="mt-2 space-y-1.5">
+            {overallReceivables
+              .filter((r) => r.total_receivable_original > 0)
+              .map((r) => (
+                <div key={r.currency} className="flex items-baseline justify-between gap-1.5 border-b border-teal-100/60 pb-1 last:border-0 last:pb-0">
+                  <span className="text-lg sm:text-xl font-black text-teal-800 font-mono">
+                    {fmtMoney(r.total_remaining, r.currency)}
+                  </span>
+                  <span className="text-[11px] font-bold text-teal-700">
+                    تم تحصيل {r.overall_progress}%
+                  </span>
+                </div>
+              ))}
+            {overallReceivables.filter((r) => r.total_receivable_original > 0).length === 0 && (
+              <div className="text-lg font-bold text-stone-600">0.00 ج.م</div>
+            )}
+          </div>
+          <div className="text-[11px] text-stone-500 mt-1">
+            {receivableSummaries.filter((r) => r.remaining > 0).length > 0 ? (
+              <span>في ذمة {receivableSummaries.filter((r) => r.remaining > 0).length} مدينين بانتظار التحصيل</span>
+            ) : (
+              <span>لا توجد مبالغ معلقة بالخارج حالياً</span>
+            )}
+          </div>
+        </div>
+
+        {/* 4. Credit Card Dues */}
+        <div className="card p-4 bg-gradient-to-br from-red-50 to-white border-red-200 shadow-2xs">
+          <div className="text-xs font-semibold text-red-900 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <span>💳</span>
+              <span>مستحقات البطاقات</span>
+            </span>
+            <span className="text-[11px] bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold">
+              تجنب الغرامة
+            </span>
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-red-600 mt-2 font-mono">
             {fmtMoney(creditOwedEGP, "EGP")}
           </div>
-          <div className="text-[11px] text-stone-500 mt-0.5">
+          <div className="text-[11px] text-stone-500 mt-1">
             {creditCards.filter((c) => !c.status || c.status !== "paid").length} بطاقات مطلوب سدادها
           </div>
         </div>
       </div>
 
-      {/* Interactive Client Core: Quick Actions, Debt Journey, Card Watchlist, Analytics */}
+      {/* Interactive Client Core: Quick Actions, Debt Journey, Receivables, Card Watchlist, Analytics */}
       <DashboardClient
-        overallDebt={overallDebt}
+        overallDebt={activeDebtSummary}
+        overallDebts={overallDebts}
         personDebts={personDebts}
+        receivables={receivableSummaries}
+        overallReceivables={overallReceivables}
         creditCards={creditCards}
         accounts={accounts}
         people={people}

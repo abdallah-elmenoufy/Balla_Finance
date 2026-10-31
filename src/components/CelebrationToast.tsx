@@ -15,6 +15,9 @@ export default function CelebrationToast() {
 
   const celebrate = searchParams.get("celebrate");
   const amount = searchParams.get("amount");
+  const currency = searchParams.get("currency") || "EGP";
+  const personAmount = searchParams.get("person_amount");
+  const personCurrency = searchParams.get("person_currency");
 
   useEffect(() => {
     if (celebrate) {
@@ -26,9 +29,17 @@ export default function CelebrationToast() {
         setMessage(rand);
       } else if (celebrate === "card_paid") {
         setMessage("تم سداد البطاقة بنجاح! تجنبت الفوائد وغرامات التأخير، استمر في الانضباط 💳✨");
+      } else if (celebrate === "receivable_collected") {
+        setMessage("الحمد لله! تم تحصيل واسترداد المبلغ المستحق بنجاح وأضيف لرصيدك المتاح 💼💰✨");
       }
       if (amount) {
-        setAmountStr(fmtMoney(Number(amount), "EGP"));
+        if (personCurrency && personAmount && personCurrency !== currency) {
+          setAmountStr(
+            `${fmtMoney(Number(amount), currency)} ➔ تم خصم ${fmtMoney(Number(personAmount), personCurrency)} من الدين 💱`
+          );
+        } else {
+          setAmountStr(fmtMoney(Number(amount), currency));
+        }
       }
       setVisible(true);
 
@@ -37,7 +48,7 @@ export default function CelebrationToast() {
       }, 7000);
       return () => clearTimeout(timer);
     }
-  }, [celebrate, amount]);
+  }, [celebrate, amount, currency, personAmount, personCurrency]);
 
   function handleDismiss() {
     setVisible(false);
@@ -45,6 +56,9 @@ export default function CelebrationToast() {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("celebrate");
     params.delete("amount");
+    params.delete("currency");
+    params.delete("person_amount");
+    params.delete("person_currency");
     const nextQuery = params.toString();
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
   }
@@ -57,7 +71,9 @@ export default function CelebrationToast() {
         <div className="text-3xl animate-pulse">🎉</div>
         <div className="flex-1" dir="auto">
           <div className="font-bold text-base flex items-center gap-2">
-            <span>سداد ناجح ومبارك!</span>
+            <span>
+              {celebrate === "receivable_collected" ? "تحصيل مستحقات مبارك!" : "سداد ناجح ومبارك!"}
+            </span>
             {amountStr && (
               <span className="text-xs bg-emerald-700/80 px-2 py-0.5 rounded-full font-mono">
                 {amountStr}

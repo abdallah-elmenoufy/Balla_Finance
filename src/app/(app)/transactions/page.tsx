@@ -34,14 +34,29 @@ export default async function TransactionsPage({
   const hasFilter = !!(filters.month || filters.accountId || filters.personId || filters.type);
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Transactions العمليات</h1>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
+            سجل العمليات المالية (Transactions)
+          </h1>
+          <p className="text-sm text-stone-500 mt-1">
+            تسجيل وتصفية وتعديل كافة المصروفات، الإيرادات، سداد الديون، والتحويلات
+          </p>
+        </div>
+      </div>
 
-      <details className="card p-4" open={!hasFilter}>
-        <summary className="cursor-pointer font-medium text-emerald-800">
-          ➕ New transaction عملية جديدة
+      {/* New Transaction Form Accordion */}
+      <details className="card p-5 border-emerald-300 shadow-sm" open={!hasFilter}>
+        <summary className="cursor-pointer font-bold text-emerald-800 text-base sm:text-lg flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <span>➕</span>
+            <span>تسجيل عملية مالية جديدة</span>
+          </span>
+          <span className="text-xs text-stone-400 font-normal">انقر لفتح / إغلاق النموذج</span>
         </summary>
-        <div className="mt-4">
+        <div className="mt-5 pt-4 border-t border-stone-100">
           <TxnForm
             accounts={accounts}
             people={people}
@@ -49,53 +64,75 @@ export default async function TransactionsPage({
             currencies={currencies}
             action={createTxn}
             redirectTo="/transactions"
-            submitLabel="Save transaction"
+            submitLabel="حفظ وتسجيل العملية"
           />
         </div>
       </details>
 
-      <form className="card p-3 flex flex-wrap gap-2 items-end text-sm">
-        <div>
-          <label className="label">Month</label>
-          <input type="month" name="month" defaultValue={sp.month ?? ""} className="input" />
+      {/* Filter Toolbar */}
+      <form className="card p-4 sm:p-5 flex flex-wrap gap-3 items-end text-sm border-stone-200">
+        <div className="flex-1 min-w-36">
+          <label className="label">الشهر</label>
+          <input
+            type="month"
+            name="month"
+            defaultValue={sp.month ?? ""}
+            className="input text-sm font-semibold"
+          />
         </div>
-        <div>
-          <label className="label">Account</label>
-          <select name="account" defaultValue={sp.account ?? ""} className="input">
-            <option value="">All</option>
+        <div className="flex-1 min-w-40">
+          <label className="label">الحساب / البطاقة</label>
+          <select name="account" defaultValue={sp.account ?? ""} className="input text-sm font-semibold">
+            <option value="">جميع الحسابات</option>
             {accounts.map((a) => (
-              <option key={a.id} value={a.id}>{a.name}</option>
+              <option key={a.id} value={a.id}>
+                {a.emoji ?? "💼"} {a.name}
+              </option>
             ))}
           </select>
         </div>
-        <div>
-          <label className="label">Person</label>
-          <select name="person" defaultValue={sp.person ?? ""} className="input">
-            <option value="">All</option>
+        <div className="flex-1 min-w-36">
+          <label className="label">الشخص</label>
+          <select name="person" defaultValue={sp.person ?? ""} className="input text-sm font-semibold">
+            <option value="">جميع الأشخاص</option>
             {people.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
             ))}
           </select>
         </div>
-        <div>
-          <label className="label">Type</label>
-          <select name="type" defaultValue={sp.type ?? ""} className="input">
-            <option value="">All</option>
+        <div className="flex-1 min-w-36">
+          <label className="label">نوع العملية</label>
+          <select name="type" defaultValue={sp.type ?? ""} className="input text-sm font-semibold">
+            <option value="">جميع الأنواع</option>
             {(Object.keys(TXN_TYPE_LABELS) as TxnType[]).map((t) => (
-              <option key={t} value={t}>{TXN_TYPE_LABELS[t]}</option>
+              <option key={t} value={t}>
+                {TXN_TYPE_LABELS[t]}
+              </option>
             ))}
           </select>
         </div>
-        <button className="btn-secondary">Filter</button>
-        {hasFilter && (
-          <a href="/transactions" className="text-xs text-stone-500 hover:underline self-center">
-            ✕ clear
-          </a>
-        )}
+        <div className="flex items-center gap-2">
+          <button className="btn text-sm py-2 px-5">تطبيق الفلتر</button>
+          {hasFilter && (
+            <a
+              href="/transactions"
+              className="text-xs text-stone-500 hover:text-red-600 hover:underline px-2 py-2"
+            >
+              إلغاء الفلتر ✕
+            </a>
+          )}
+        </div>
       </form>
 
-      <div className="card p-4">
-        <TxnTable txns={txns} />
+      {/* Transactions Table Card */}
+      <div className="card p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold text-lg text-stone-900">قائمة العمليات المسجلة</h2>
+          <span className="text-xs text-stone-400 font-semibold">{txns.length} عملية</span>
+        </div>
+        <TxnTable txns={txns} showActions={true} />
       </div>
     </div>
   );

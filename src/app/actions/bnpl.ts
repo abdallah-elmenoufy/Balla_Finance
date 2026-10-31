@@ -45,14 +45,73 @@ export async function createPlan(formData: FormData): Promise<void> {
     const ins = d.prepare(
       "INSERT INTO bnpl_installments (plan_id, seq, due_date, amount) VALUES (?,?,?,?)"
     );
-    for (let i = 0; i < count; i++) {
-      const amount = i === count - 1 ? total - per * (count - 1) : per;
-      ins.run(plan.lastInsertRowid, i + 1, addMonths(first_due_date, i), amount);
+
+    // Check for custom schedule from form
+    const customScheduleRaw = formData.get("custom_schedule_json");
+    let customItems: { seq: number; due_date: string; amount: number }[] | null = null;
+    if (customScheduleRaw) {
+      try {
+        const parsed = JSON.parse(String(customScheduleRaw)) as {
+          seq: number;
+          due_date: string;
+          amount: string | number;
+        }[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          customItems = parsed.map((item, idx) => ({
+            seq: idx + 1,
+            due_date: String(item.due_date).trim(),
+            amount: toMinor(String(item.amount), dec),
+          }));
+        }
+      } catch {}
+    }
+
+    if (customItems && customItems.length > 0) {
+      for (const item of customItems) {
+        ins.run(plan.lastInsertRowid, item.seq, item.due_date, item.amount);
+      }
+    } else {
+      for (let i = 0; i < count; i++) {
+        const amount = i === count - 1 ? total - per * (count - 1) : per;
+        ins.run(plan.lastInsertRowid, i + 1, addMonths(first_due_date, i), amount);
+      }
     }
   });
   tx();
   revalidatePath("/", "layout");
   redirect("/bnpl");
+}
+
+export async function updateInstallment(id: number, formData: FormData): Promise<void> {
+  await requireAuth();
+  const d = db();
+  const inst = d
+    .prepare(
+      `SELECT i.*, a.currency FROM bnpl_installments i
+       JOIN bnpl_plans pl ON pl.id = i.plan_id
+       JOIN accounts a ON a.id = pl.account_id
+       WHERE i.id=?`
+    )
+    .get(id) as { id: number; currency: string } | undefined;
+  if (!inst) return;
+  const dec = getCurrency(inst.currency)?.decimals ?? 2;
+  const due_date = String(formData.get("due_date") ?? "").trim();
+  const amountRaw = String(formData.get("amount") ?? "").trim();
+  const amount = amountRaw ? toMinor(amountRaw, dec) : undefined;
+  if (!due_date && amount === undefined) return;
+
+  if (due_date && amount !== undefined) {
+    d.prepare("UPDATE bnpl_installments SET due_date=?, amount=? WHERE id=?").run(
+      due_date,
+      amount,
+      id
+    );
+  } else if (due_date) {
+    d.prepare("UPDATE bnpl_installments SET due_date=? WHERE id=?").run(due_date, id);
+  } else if (amount !== undefined) {
+    d.prepare("UPDATE bnpl_installments SET amount=? WHERE id=?").run(amount, id);
+  }
+  revalidatePath("/", "layout");
 }
 
 export async function payInstallment(formData: FormData): Promise<void> {

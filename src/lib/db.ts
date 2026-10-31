@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS people (
   note TEXT,
   initial_debt INTEGER NOT NULL DEFAULT 0,
   initial_currency TEXT NOT NULL DEFAULT 'EGP',
+  initial_type TEXT NOT NULL DEFAULT 'debt',
   archived INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -142,6 +143,9 @@ function migrate(d: Database.Database) {
   } catch {}
   try {
     d.prepare("ALTER TABLE accounts ADD COLUMN statement_day INTEGER").run();
+  } catch {}
+  try {
+    d.prepare("ALTER TABLE people ADD COLUMN initial_type TEXT NOT NULL DEFAULT 'debt'").run();
   } catch {}
 }
 

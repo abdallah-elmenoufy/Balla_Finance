@@ -11,15 +11,19 @@ export async function createPerson(formData: FormData): Promise<void> {
   const name = String(formData.get("name") ?? "").trim();
   const note = String(formData.get("note") ?? "").trim() || null;
   const initialCurrency = String(formData.get("initial_currency") ?? "EGP").trim() || "EGP";
+  const initialType =
+    String(formData.get("initial_type") ?? "debt").trim() === "receivable"
+      ? "receivable"
+      : "debt";
   const dec = getCurrency(initialCurrency)?.decimals ?? 2;
   const initialDebtRaw = String(formData.get("initial_debt") ?? "").trim();
   const initialDebt = initialDebtRaw ? toMinor(initialDebtRaw, dec) : 0;
   if (!name) return;
   db()
     .prepare(
-      "INSERT INTO people (name, note, initial_debt, initial_currency) VALUES (?,?,?,?)"
+      "INSERT INTO people (name, note, initial_debt, initial_currency, initial_type) VALUES (?,?,?,?,?)"
     )
-    .run(name, note, initialDebt, initialCurrency);
+    .run(name, note, initialDebt, initialCurrency, initialType);
   revalidatePath("/", "layout");
 }
 
@@ -28,15 +32,19 @@ export async function updatePerson(id: number, formData: FormData): Promise<void
   const name = String(formData.get("name") ?? "").trim();
   const note = String(formData.get("note") ?? "").trim() || null;
   const initialCurrency = String(formData.get("initial_currency") ?? "EGP").trim() || "EGP";
+  const initialType =
+    String(formData.get("initial_type") ?? "debt").trim() === "receivable"
+      ? "receivable"
+      : "debt";
   const dec = getCurrency(initialCurrency)?.decimals ?? 2;
   const initialDebtRaw = String(formData.get("initial_debt") ?? "").trim();
   const initialDebt = initialDebtRaw ? toMinor(initialDebtRaw, dec) : 0;
   if (!name) return;
   db()
     .prepare(
-      "UPDATE people SET name=?, note=?, initial_debt=?, initial_currency=? WHERE id=?"
+      "UPDATE people SET name=?, note=?, initial_debt=?, initial_currency=?, initial_type=? WHERE id=?"
     )
-    .run(name, note, initialDebt, initialCurrency, id);
+    .run(name, note, initialDebt, initialCurrency, initialType, id);
   revalidatePath("/", "layout");
 }
 

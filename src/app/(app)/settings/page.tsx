@@ -24,69 +24,111 @@ export default async function SettingsPage() {
     .all() as Person[];
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Settings الإعدادات</h1>
-
-      <div className="card p-4">
-        <h2 className="font-semibold mb-2">💾 Backup النسخ الاحتياطي</h2>
-        <p className="text-sm text-stone-600 mb-3">
-          All your data lives in one file (<code>data/balla.db</code>). Download a copy
-          regularly and keep it somewhere safe (iCloud, Google Drive…).
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
+          الإعدادات والنسخ الاحتياطي (Settings)
+        </h1>
+        <p className="text-sm text-stone-500 mt-1">
+          إدارة العملات، التصنيفات، حماية التطبيق برقم السري، وتنزيل نسخة احتياطية لأمان بياناتك
         </p>
-        <a href="/api/backup" className="btn">⬇️ Download backup</a>
       </div>
 
-      <div className="card p-4">
-        <h2 className="font-semibold mb-3">💱 Currencies العملات</h2>
-        <div className="flex flex-wrap gap-2 mb-3">
+      {/* Backup Card */}
+      <div className="card p-6 border-emerald-200 bg-gradient-to-br from-emerald-50/40 to-white shadow-sm space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">💾</span>
+          <h2 className="text-lg font-bold text-stone-900">النسخ الاحتياطي للبيانات (Backup)</h2>
+        </div>
+        <p className="text-sm text-stone-600 leading-relaxed">
+          جميع بياناتك المالية، الحسابات، الديون، وسجل المعاملات محفوظة محلياً بالكامل على جهازك في ملف واحد (<code>data/balla.db</code>).
+          قم بتنزيل نسخة احتياطية بانتظام واحتفظ بها على Google Drive أو iCloud لضمان عدم ضياع أي سجل.
+        </p>
+        <div className="pt-1">
+          <a href="/api/backup" className="btn text-sm py-2.5 px-5">
+            ⬇️ تنزيل نسخة احتياطية من قاعدة البيانات
+          </a>
+        </div>
+      </div>
+
+      {/* Currencies Management */}
+      <div className="card p-6 border-stone-200 shadow-sm space-y-4">
+        <div>
+          <h2 className="text-lg font-bold text-stone-900 flex items-center gap-2">
+            <span>💱</span>
+            <span>العملات المعتمدة (Currencies)</span>
+          </h2>
+          <p className="text-xs text-stone-500 mt-0.5">
+            يمكنك إضافة أي عملة عربية أو أجنبية لتتبع حساباتك أو ديونك بها
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
           {currencies.map((c) => (
-            <span key={c.code} className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-stone-50 px-3 py-1 text-sm">
-              <b>{c.code}</b> {c.symbol}
+            <span
+              key={c.code}
+              className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3.5 py-1.5 text-sm font-semibold"
+            >
+              <b>{c.code}</b> ({c.name}) {c.symbol}
               <ConfirmButton
                 action={deleteCurrency.bind(null, c.code)}
                 label="✕"
-                message={`Remove ${c.code}? (Only works if unused)`}
-                className="text-stone-400 hover:text-red-600 cursor-pointer text-xs"
+                message={`حذف العملة ${c.code}؟ (يعمل فقط إذا لم تكن مستخدمة في أي حساب أو حركة)`}
+                className="text-stone-400 hover:text-red-600 cursor-pointer text-xs p-0.5"
               />
             </span>
           ))}
         </div>
-        <form action={addCurrency} className="grid grid-cols-4 gap-2 items-end">
+
+        <form action={addCurrency} className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end pt-2 border-t border-stone-100 text-sm">
           <div>
-            <label className="label">Code</label>
-            <input name="code" maxLength={3} required className="input" placeholder="KWD" />
+            <label className="label">رمز العملة (الكود)</label>
+            <input name="code" maxLength={3} required className="input text-sm uppercase font-bold" placeholder="KWD" />
           </div>
           <div>
-            <label className="label">Name</label>
-            <input name="name" required className="input" placeholder="Kuwaiti Dinar" />
+            <label className="label">اسم العملة</label>
+            <input name="name" required className="input text-sm" placeholder="دينار كويتي" />
           </div>
           <div>
-            <label className="label">Symbol</label>
-            <input name="symbol" className="input" placeholder="د.ك" />
+            <label className="label">الرمز المختصر</label>
+            <input name="symbol" className="input text-sm" placeholder="د.ك" />
           </div>
-          <button className="btn">Add</button>
+          <button className="btn text-sm py-2.5">إضافة العملة</button>
         </form>
       </div>
 
-      <div className="card p-4">
-        <h2 className="font-semibold mb-3">🏷 Categories التصنيفات</h2>
-        <div className="grid sm:grid-cols-2 gap-4">
+      {/* Categories Management */}
+      <div className="card p-6 border-stone-200 shadow-sm space-y-4">
+        <div>
+          <h2 className="text-lg font-bold text-stone-900 flex items-center gap-2">
+            <span>🏷</span>
+            <span>تصنيفات المصروفات والدخل (Categories)</span>
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {(["expense", "income"] as const).map((kind) => (
-            <div key={kind}>
-              <div className="text-xs font-medium text-stone-500 mb-1.5">
-                {kind === "expense" ? "Expenses مصروفات" : "Income دخل"}
+            <div key={kind} className="space-y-2">
+              <div className="text-sm font-bold text-stone-700">
+                {kind === "expense" ? "🛒 تصنيفات المصروفات" : "💰 تصنيفات الدخل"}
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {categories
                   .filter((c) => c.kind === kind)
                   .map((c) => (
-                    <span key={c.id} className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-sm" dir="auto">
-                      {c.emoji} {c.name}
+                    <span
+                      key={c.id}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-medium"
+                      dir="auto"
+                    >
+                      <span>{c.emoji}</span>
+                      <span>{c.name}</span>
                       <ConfirmButton
                         action={deleteCategory.bind(null, c.id)}
                         label="✕"
-                        message={`Delete category "${c.name}"? Transactions keep their data but lose this label.`}
-                        className="text-stone-400 hover:text-red-600 cursor-pointer text-xs"
+                        message={`حذف تصنيف "${c.name}"؟`}
+                        className="text-stone-400 hover:text-red-600 cursor-pointer text-xs p-0.5 mr-1"
                       />
                     </span>
                   ))}
@@ -94,53 +136,69 @@ export default async function SettingsPage() {
             </div>
           ))}
         </div>
-        <form action={createCategory} className="mt-3 grid grid-cols-4 gap-2 items-end">
+
+        <form action={createCategory} className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end pt-3 border-t border-stone-100 text-sm">
           <div>
-            <label className="label">Emoji</label>
-            <input name="emoji" className="input" placeholder="🎁" />
+            <label className="label">الأيقونة (Emoji)</label>
+            <input name="emoji" className="input text-sm text-center" placeholder="🎁" />
           </div>
           <div>
-            <label className="label">Name</label>
-            <input name="name" dir="auto" required className="input" placeholder="هدايا" />
+            <label className="label">اسم التصنيف</label>
+            <input name="name" dir="auto" required className="input text-sm" placeholder="هدايا / إلكترونيات..." />
           </div>
           <div>
-            <label className="label">Kind</label>
-            <select name="kind" className="input">
-              <option value="expense">Expense</option>
-              <option value="income">Income</option>
+            <label className="label">النوع</label>
+            <select name="kind" className="input text-sm font-medium">
+              <option value="expense">مصروف (Expense)</option>
+              <option value="income">دخل (Income)</option>
             </select>
           </div>
-          <button className="btn">Add</button>
+          <button className="btn text-sm py-2.5">إضافة التصنيف</button>
         </form>
       </div>
 
+      {/* Archived Records */}
       {(archivedAccounts.length > 0 || archivedPeople.length > 0) && (
-        <div className="card p-4">
-          <h2 className="font-semibold mb-2">🗄 Archived المؤرشف</h2>
-          <div className="flex flex-wrap gap-2">
+        <div className="card p-6 border-stone-200 shadow-sm space-y-3">
+          <h2 className="text-lg font-bold text-stone-900 flex items-center gap-2">
+            <span>🗄</span>
+            <span>الأرشيف (الحسابات والأشخاص المخفيون)</span>
+          </h2>
+          <p className="text-xs text-stone-500">انقر على أي عنصر لإلغاء أرشفته واستعادته للشاشة الرئيسية</p>
+          <div className="flex flex-wrap gap-2 pt-1">
             {archivedAccounts.map((a) => (
               <form key={`a${a.id}`} action={unarchiveAccount.bind(null, a.id)}>
-                <button className="btn-secondary text-xs" dir="auto">
-                  ♻️ {a.emoji ?? "💼"} {a.name}
+                <button className="btn-secondary text-xs py-1.5 px-3 rounded-lg" dir="auto">
+                  استعادة ♻️ {a.emoji ?? "💼"} {a.name}
                 </button>
               </form>
             ))}
             {archivedPeople.map((p) => (
               <form key={`p${p.id}`} action={unarchivePerson.bind(null, p.id)}>
-                <button className="btn-secondary text-xs" dir="auto">♻️ 🤝 {p.name}</button>
+                <button className="btn-secondary text-xs py-1.5 px-3 rounded-lg" dir="auto">
+                  استعادة ♻️ 🤝 {p.name}
+                </button>
               </form>
             ))}
           </div>
-          <p className="text-xs text-stone-400 mt-2">Click to restore.</p>
         </div>
       )}
 
-      <div className="card p-4">
-        <h2 className="font-semibold mb-3">🔒 Security</h2>
+      {/* Security & Password */}
+      <div className="card p-6 border-stone-200 shadow-sm space-y-4">
+        <div>
+          <h2 className="text-lg font-bold text-stone-900 flex items-center gap-2">
+            <span>🔒</span>
+            <span>الأمان وحماية التطبيق</span>
+          </h2>
+          <p className="text-xs text-stone-500 mt-0.5">تغيير الرقم السري لحماية بياناتك من المتصلين على نفس شبكة الواي فاي</p>
+        </div>
         <ChangePinForm />
-        <form action={logout} className="mt-4">
-          <button className="btn-danger">🚪 Log out</button>
-        </form>
+        <div className="pt-3 border-t border-stone-100 flex justify-end">
+          <form action={logout}>
+            <button className="btn-danger text-sm py-2 px-4">🚪 تسجيل الخروج وقفل التطبيق</button>
+          </form>
+        </div>
       </div>
     </div>
   );
